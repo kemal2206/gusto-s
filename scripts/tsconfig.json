@@ -1,0 +1,18 @@
+{
+  "//": "Node script'leri için ayrı yapılandırma. Uygulama tsconfig'i React Native ortamını tanımlıyor; burada Node global'leri ve .ts uzantılı import gerekiyor (tsx böyle çalışıyor).",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ES2023"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../src/*"],
+      "@/assets/*": ["../assets/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": []
+}
