@@ -14,8 +14,9 @@ export const TILE_WIDTH = 168;
 /**
  * Yatay raylardaki tarif kartı.
  *
- * `Recipe.imageUrl` geldiğinde bu alan fotoğrafa dönüşecek.
- * Şimdilik gerçekçi bir uygulama hissi için placeholder görseller kullanıyoruz.
+ * Tarifin kendi fotoğrafı varsa (`Recipe.imageUrl`) o gösteriliyor. Yoksa
+ * yer tutucuya düşüyoruz — o fotoğrafın tarifle ilgisi yok, sadece kartın
+ * boş görünmemesi için duruyor.
  */
 export function RecipeTile({ recipe, inverse, fluid, matchHint }: { recipe: Recipe; inverse?: boolean; fluid?: boolean; matchHint?: string }) {
   const router = useRouter();
@@ -24,8 +25,8 @@ export function RecipeTile({ recipe, inverse, fluid, matchHint }: { recipe: Reci
 
   const category = CATEGORY_BY_ID.get(recipe.categoryId);
   
-  // Use a pseudo-random but consistent image URL for each recipe
-  const imageUrl = `https://loremflickr.com/400/400/food,meal,dish?random=${recipe.slug}`;
+  const imageUrl =
+    recipe.imageUrl ?? `https://picsum.photos/seed/${recipe.slug}/400/400`;
 
   return (
     <View style={[styles.tile, fluid && { width: '100%' }]}>

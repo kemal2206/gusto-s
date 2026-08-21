@@ -13,6 +13,7 @@
 
 import { BY_SLUG } from '@/data/catalog';
 import { ELIMINATION_BY_ID } from '@/data/catalog/eliminasyon';
+import { herhangiBiri, kelimeBasi, tamKelime } from '@/data/catalog/tr-kelime';
 import type { Recipe } from '@/data/recipes';
 import type { Appliance, DietRestriction, Household } from '@/lib/profile-model';
 import { eaterCount } from '@/lib/profile-model';
@@ -71,12 +72,33 @@ export interface ProfileFilter {
  * eşleşmemiş). Vejetaryen birine et göstermek, bir tarifi fazladan elemekten
  * çok daha kötü — bu yüzden ada da bakıyoruz.
  */
-const NAME_BLOCK: Partial<Record<DietRestriction, RegExp>> = {
-  vegan: /et|etli|tavuk|piliç|hindi|kuzu|dana|balık|karides|midye|kalamar|hamsi|somon|sucuk|pastırma|kıyma|köfte|kebap|yumurta|peynir|yoğurt|süt|kaymak|tereyağ|bal\b/i,
-  vejetaryen: /\bet\b|etli|tavuk|piliç|hindi|kuzu|dana|balık|karides|midye|kalamar|hamsi|somon|uskumru|palamut|sucuk|pastırma|kıyma|köfte|kebap|ciğer/i,
-  pesketaryen: /\bet\b|etli|tavuk|piliç|hindi|kuzu|dana|sucuk|pastırma|kıyma|köfte|kebap|ciğer/i,
-  laktozsuz: /peynir|yoğurt|sütlü|sütlaç|kaymak|tereyağ|krema|muhallebi|beşamel/i,
-  glutensiz: /börek|pide|makarna|erişte|mantı|ekmek|poğaça|açma|çörek|baklava|kadayıf|lahmacun|un\b/i,
+/**
+ * Kelime sınırları `tr-kelime.ts`'ten geliyor ve şart. Kalıplar önceden düz
+ * içerme kontrolüydü: "lezzetli" diyen her sebze yemeği vejetaryen
+ * süzgecinden eleniyordu (`etli`), "kavun" da glutensizden (`un`).
+ *
+ * Vegan satırında ayrıca bozuk bir kaçış vardı — `\b` yerine dosyaya gerçek
+ * backspace karakteri yazılmış, o yüzden "et" kalıbı hiçbir şeyle
+ * eşleşmiyordu ve sessizce ölüydü.
+ *
+ * İki istisna elle yazılı:
+ *   hindi   "Hindistan cevizi" hayvansal değil
+ *   kuzu    "kuzugöbeği" bir mantar
+ */
+const ET = ['tavuk', 'piliç', 'hindi(?!stan)', 'kuzu(?!göbeği)', 'dana', 'sucuk',
+  'pastırma', 'kıyma', 'köfte', 'kebap', 'ciğer'];
+const DENIZ = ['balık', 'karides', 'midye', 'kalamar', 'hamsi', 'somon', 'uskumru', 'palamut'];
+const SUT = ['peynir', 'yoğurt', 'sütlü', 'sütlaç', 'kaymak', 'tereyağ', 'krema',
+  'muhallebi', 'beşamel'];
+const HAMUR = ['börek', 'pide', 'makarna', 'erişte', 'mantı', 'ekmek', 'poğaça', 'açma',
+  'çörek', 'baklava', 'kadayıf', 'lahmacun'];
+
+const NAME_BLOCK: Partial<Record<DietRestriction, RegExp[]>> = {
+  vegan: [kelimeBasi(...ET, ...DENIZ, ...SUT, 'etli', 'yumurta', 'süt'), tamKelime('et', 'bal')],
+  vejetaryen: [kelimeBasi(...ET, ...DENIZ, 'etli'), tamKelime('et')],
+  pesketaryen: [kelimeBasi(...ET, 'etli'), tamKelime('et')],
+  laktozsuz: [kelimeBasi(...SUT)],
+  glutensiz: [kelimeBasi(...HAMUR), tamKelime('un')],
 };
 
 /** Tarif diyet kısıtlarına, eliminasyonlara ve sevilmeyenlere uyuyor mu? */
@@ -104,8 +126,8 @@ export function isAllowed(recipe: Recipe, p: ProfileFilter): boolean {
   }
 
   for (const diet of p.diets) {
-    const nameRe = NAME_BLOCK[diet];
-    if (nameRe && (nameRe.test(recipe.title) || nameRe.test(recipe.summary))) return false;
+    const nameRes = NAME_BLOCK[diet];
+    if (nameRes && herhangiBiri(nameRes, recipe.title, recipe.summary)) return false;
 
     const rule = DIET_BLOCK[diet];
     if (!rule) continue;
@@ -159,18 +181,53 @@ export interface ScaledIngredient {
 /**
  * Tarifi hanenin kişi sayısına göre ölçekler.
  *
- * Baharat doğrusal ölçeklenmiyor: 4 kişilik tarifi 8 kişiye çıkarırken
- * karabiberi ikiye katlamak yemeği acıtır. Baharat ve otlar karekök
- * oranıyla artıyor — mutfakta yerleşik pratik budur.
+ * Baharat doğrusal ölçeklenmiyor: 4 kişilik tarifi 12 kişiye çıkarırken
+ * karabiberi üçe katlamak yemeği acıtır. Ama bu kural iki yerde yanlış
+ * uygulanıyordu ve tadı gerçekten bozuyordu — ikisi de düzeltildi, gerekçesi
+ * `scaleGrams` içinde.
  */
 export function scaleFactor(recipe: Recipe, household: Household): number {
-  return eaterCount(household) / Math.max(1, recipe.servings);
+  return scaleFactorFor(recipe, eaterCount(household));
+}
+
+/**
+ * Haneden bağımsız, verilen kişi sayısına ölçek.
+ *
+ * Tarif sayfasındaki "kişilik" butonu bunu kullanıyor: misafir geldiğinde
+ * hane ayarını değiştirmeden o tarifi altı kişiye çıkarabilmek gerekiyor.
+ */
+export function scaleFactorFor(recipe: Recipe, people: number): number {
+  return Math.max(1, people) / Math.max(1, recipe.servings);
 }
 
 export function scaleGrams(slug: string, grams: number, factor: number): number {
   const ing = BY_SLUG.get(slug);
-  const gentle = ing && (ing.category === 'baharat' || ing.category === 'ot');
-  const f = gentle ? Math.sqrt(factor) : factor;
-  const out = grams * f;
+  const potency = ing?.potency ?? 1;
+
+  /**
+   * Sönümleme yalnızca BÜYÜTMEDE ve malzemenin gücüyle orantılı.
+   *
+   * Eski hâli iki yerden hatalıydı ve ikisi de ölçüldü:
+   *
+   *  **1. Küçültmede de sönümlüyordu.** Karekök simetrik çalışıyor: 4 kişilik
+   *  tarifi 2 kişiye indirince baharat yarıya değil %71'e iniyordu, yani
+   *  kişi başına baharat %50 ARTIYORDU. 1 kişide iki katına çıkıyordu.
+   *  Varsayılan hane 2 kişi ve tarifler 4 kişilik yazılıyor — yani bu, çoğu
+   *  kullanıcının gördüğü hâldi. Mutfaktaki "baharatı doğrusal artırma"
+   *  kuralı büyük partiler içindir; tersi diye bir şey yok. Küçültmede
+   *  ölçek artık birebir.
+   *
+   *  **2. Kategoriye bakıyordu, güce değil.** "Baharat" kategorisindeki her
+   *  şeye aynı karekök uygulanıyordu; oysa safran ile kimyon aynı şey değil.
+   *  Katalog zaten `potency` tutuyor (patates 1, sarımsak 4, karabiber 8,
+   *  safran 10) — sönümleme artık ondan geliyor. Gücü 2'nin altındaki
+   *  malzeme doğrusal ölçekleniyor.
+   *
+   * Karekök (üs 0.5) ayrıca fazla sertti: 12 kişide baharat derişimi %58'e
+   * düşüyordu. Yeni üs karabiberde 0.7, safranda 0.65 — 12 kişide %72.
+   */
+  const damping = Math.min(0.35, Math.max(0, (potency - 2) / 20));
+  const exponent = factor <= 1 ? 1 : 1 - damping;
+  const out = grams * Math.pow(factor, exponent);
   return out < 5 ? Math.round(out * 2) / 2 : Math.round(out);
 }

@@ -81,10 +81,34 @@ export const PRESETS: Record<PresetId, Preset> = {
  * dengeye bakınca kuzu etinin yanına kuru nane değil kuru domates çıkıyor,
  * ki bu Türk mutfağı açısından yanlış.
  */
+/**
+ * Lezzet Lab zincirinin ağırlıkları — **ölçülerek** seçildi.
+ *
+ * Önceki değerler `aroma 0.30 · denge 0.27 · gelenek 0.33` idi ve denge
+ * payı fazla düşüktü: sosun aromatik adımında kremalı bir sosa vanilya,
+ * tatlı-ekşi bir sosa dereotu öneriliyordu. Katalog genelinde ölçüldü
+ * (`npm run denetim:oneri -- --tara`, 104 ana malzeme × 7 tat hedefi,
+ * ana yemek ve sos birlikte, 12.409 öneri):
+ *
+ *   ağırlık                      hedeften uzaklaştıran   ortalama bağ
+ *   0.30 / 0.27 / 0.33  (eski)          %1.40                0.694
+ *   0.24 / 0.43 / 0.23                  %1.00                0.686
+ *   0.20 / 0.52 / 0.18  (yeni)          %0.71                0.677
+ *
+ * Karşı ölçüt şarttı: dengeyi tek başına artırmak kimyasal bağı zayıf
+ * adayları öne çıkarabilirdi ve Lab'in bütün iddiası "gerekçesiz seçenek
+ * göstermemek". Bağ gücü %2,5 düştü — ihmal edilebilir.
+ *
+ * Gelenek payını 0.33'ten 0.18'e indirmenin motorun mutfak bilgisini
+ * zedeleyip zedelemediği ayrıca ölçüldü (`degerlendirme:motor`, birini
+ * dışarıda bırak): recall@10 %48,0 → %48,0, yani hiç değişmedi. Yalnızca
+ * recall@5 iki puan düştü. Kültürel önsel hâlâ ağın içinde; ağırlığı
+ * azalınca kaybolmuyor.
+ */
 export const CHAIN_WEIGHTS: ScoreWeights = {
-  aroma: 0.3,
-  balance: 0.27,
-  prior: 0.33,
+  aroma: 0.2,
+  balance: 0.52,
+  prior: 0.18,
   role: 0.1,
 };
 
@@ -109,6 +133,9 @@ export const DEFAULT_OPTIONS: EngineOptions = {
  * tabaktaki malzemelerin ÇOĞUYLA bağlı olan adayı öne çıkarıyor.
  */
 const COHERENCE_BONUS = 0.18;
+
+/** Uyum tablosunun "geri plan" kademesinin skor cezası. */
+const DEMOTE_PENALTY = 0.22;
 
 /**
  * Akrabalık cezası — aynı şeyin ikinci hâli.
@@ -397,6 +424,12 @@ export function suggestAdditions(
     let penalty = balance ? overshootPenalty(balance) : 0;
     if (relation.aroma < 0.03 && relation.prior <= 0) penalty += 0.25;
     if (kinClash(dish, candidate)) penalty += KIN_PENALTY;
+
+    /**
+     * Uyum cezası — korpusta ana malzemenin yemek türünde seyrek görülen
+     * malzeme listeden düşmüyor ama öne de çıkmıyor.
+     */
+    if (opts.demoteIngredientIds?.includes(candidate.id)) penalty += DEMOTE_PENALTY;
 
     const score = clamp01(
       w.aroma * aromaTerm +

@@ -18,6 +18,8 @@
  * yaygın kabul gören ortak çekirdek; kullanıcı üstüne ekleyip çıkarabiliyor.
  */
 
+import { kelimeBasi } from './tr-kelime';
+
 export type EliminationId = 'sut-yumurta-gluten' | 'histamin' | 'nikel';
 
 export interface Elimination {
@@ -35,6 +37,9 @@ export interface Elimination {
    * Malzeme listesi her zaman eksiksiz değil: içe aktarılan korpusta adı
    * "Sütlü Tatlı" olup sütü eşleşmemiş tarifler var. Tercih filtresinde bu
    * küçük bir hata, sağlık filtresinde değil — o yüzden ada da bakıyoruz.
+   *
+   * Kalıp `kelimeBasi` ile kuruluyor; düz içerme kontrolü `balık` kelimesini
+   * "kalabalık"ta, `açma`yı "kaçmaz"da buluyordu.
    */
   nameBlock: RegExp;
 }
@@ -58,7 +63,10 @@ export const ELIMINATIONS: Elimination[] = [
       'mayonez', 'krem-santi',
     ],
     nameBlock:
-      /süt|peynir|yoğurt|ayran|kaymak|tereyağ|krema|yumurta|omlet|menemen|börek|pide|makarna|erişte|mantı|ekmek|poğaça|açma|çörek|baklava|kadayıf|lahmacun|muhallebi|beşamel|sütlaç/i,
+      kelimeBasi('süt', 'peynir', 'yoğurt', 'ayran', 'kaymak', 'tereyağ', 'krema',
+        'yumurta', 'omlet', 'menemen', 'börek', 'pide', 'makarna', 'erişte', 'mantı',
+        'ekmek', 'poğaça', 'açma', 'çörek', 'baklava', 'kadayıf', 'lahmacun',
+        'muhallebi', 'beşamel', 'sütlaç'),
   },
   {
     id: 'histamin',
@@ -83,7 +91,9 @@ export const ELIMINATIONS: Elimination[] = [
       // Kakao ve alkol
       'bitter-cikolata', 'kakao', 'kirmizi-sarap', 'beyaz-sarap', 'raki',
     ],
-    nameBlock: /turşu|sirke|salam|sucuk|pastırma|balık|hamsi|somon|midye|karides|kalamar|şarap|domates|ıspanak|patlıcan|çikolata|zeytin/i,
+    nameBlock: kelimeBasi('turşu', 'sirke', 'salam', 'sucuk', 'pastırma', 'balık', 'hamsi',
+      'somon', 'midye', 'karides', 'kalamar', 'şarap', 'domates', 'ıspanak',
+      'patlıcan', 'çikolata', 'zeytin'),
   },
   {
     id: 'nikel',
@@ -100,7 +110,8 @@ export const ELIMINATIONS: Elimination[] = [
       'kakao', 'bitter-cikolata', 'misir-konserve', 'soya-sosu',
       'bezelye', 'bakla', 'tofu',
     ],
-    nameBlock: /nohut|mercimek|fasulye|barbunya|börülce|ceviz|fındık|badem|fıstık|çikolata|ıspanak|domates|bulgur/i,
+    nameBlock: kelimeBasi('nohut', 'mercimek', 'fasulye', 'barbunya', 'börülce', 'ceviz',
+      'fındık', 'badem', 'fıstık', 'çikolata', 'ıspanak', 'domates', 'bulgur'),
   },
 ];
 

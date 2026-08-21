@@ -57,6 +57,9 @@
     "smoke:kesfet": "tsx scripts/smoke-kesfet.ts",
     "smoke:sizinti": "tsx scripts/smoke-sizinti.ts",
     "smoke:eliminasyon": "tsx scripts/smoke-eliminasyon.ts",
+    "smoke:yemekcom": "tsx scripts/smoke-yemekcom.ts",
+    "smoke:pisirme": "tsx scripts/smoke-pisirme.ts",
+    "smoke:lab": "tsx scripts/smoke-lab-tarif.ts",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
@@ -66,7 +69,16 @@
     "data:families": "tsx scripts/pipeline/03-families.ts",
     "data:map": "tsx scripts/pipeline/04-tr-map.ts",
     "check:recipes": "tsx scripts/check-recipes.ts",
-    "data:tarif": "tsx scripts/pipeline/05-tarif-ithal.ts"
+    "data:tarif": "tsx scripts/pipeline/05-tarif-ithal.ts",
+    "data:yemekcom": "tsx scripts/pipeline/06-yemekcom-ithal.ts",
+    "data:besin": "tsx scripts/pipeline/07-besin-ithal.ts",
+    "data:npmi": "tsx scripts/pipeline/08-npmi.ts",
+    "data:uyum": "tsx scripts/pipeline/10-uyum.ts",
+    "data:datahive": "tsx scripts/pipeline/09-datahive-fetch.ts",
+    "kalibrasyon:besin": "tsx scripts/kalibrasyon-besin.ts",
+    "kalibrasyon:tr": "tsx scripts/kalibrasyon-tr.ts",
+    "degerlendirme:motor": "tsx scripts/degerlendirme-motor.ts",
+    "denetim:oneri": "tsx scripts/denetim-oneri.ts"
   },
   "private": true
 }

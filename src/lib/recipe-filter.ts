@@ -6,7 +6,7 @@
  * kalmıyor, en uygunlar başa geliyor.
  */
 
-import { BY_SLUG } from '@/data/catalog';
+import { BY_SLUG, INGREDIENTS } from '@/data/catalog';
 import { RECIPES, type Recipe } from '@/data/recipes';
 import { nutritionOf } from '@/lib/recipe-facts';
 import { dishTaste, heatLevel, ingredientCount, isOnePot } from '@/lib/recipe-taste';
@@ -520,6 +520,12 @@ export interface PickMatch {
   /** Seçilenlerden kaçı bu tarifte var. */
   shared: number;
   sharedSlugs: string[];
+  /**
+   * Hangi kademeden geldi. Arayüz bunu söylemek zorunda: "kuzu incik tarifi
+   * yok, kuzu but tarifleri gösteriliyor" demek, sessizce başka bir şey
+   * göstermekten dürüst.
+   */
+  level: 'tam' | 'akraba' | 'kategori';
 }
 
 /**
@@ -531,23 +537,85 @@ export interface PickMatch {
  */
 export function recipesForPicks(slugs: string[], limit = 8): PickMatch[] {
   if (!slugs.length) return [];
-  const [main, ...rest] = slugs;
+  const [main] = slugs;
 
-  const out: PickMatch[] = [];
-  for (const recipe of RECIPES) {
-    if (!recipe.allSlugs.includes(main)) continue;
-    const sharedSlugs = slugs.filter((s) => recipe.allSlugs.includes(s));
-    out.push({ recipe, shared: sharedSlugs.length, sharedSlugs });
-  }
-
-  return out
-    .sort(
+  const collect = (accept: (r: Recipe) => boolean, level: PickMatch['level']): PickMatch[] => {
+    const out: PickMatch[] = [];
+    for (const recipe of RECIPES) {
+      if (!accept(recipe)) continue;
+      const sharedSlugs = slugs.filter((s) => recipe.allSlugs.includes(s));
+      out.push({ recipe, shared: sharedSlugs.length, sharedSlugs, level });
+    }
+    return out.sort(
       (a, b) =>
         b.shared - a.shared ||
         // Eşitlikte daha az malzemeli tarif önce: kurduğuna daha yakın.
         a.recipe.allSlugs.length - b.recipe.allSlugs.length,
-    )
-    .slice(0, limit);
+    );
+  };
+
+  // 1. Tam eşleşme — ana malzemenin kendisi tarifte var.
+  const exact = collect((r) => r.allSlugs.includes(main), 'tam');
+  if (exact.length) return exact.slice(0, limit);
+
+  /**
+   * 2. Akrabalık düşüşü.
+   *
+   * Katalogdaki `kin` alanı aynı şeyin farklı hâllerini bağlıyor (kuzu but /
+   * kuzu incik, taze nane / kuru nane). Kuzu incikte tarif yoksa kuzu but
+   * tarifleri kullanıcının kurduğu şeye hâlâ en yakın cevap.
+   */
+  const mainIng = BY_SLUG.get(main);
+  if (mainIng?.kin) {
+    const kinSlugs = INGREDIENTS.filter((i) => i.kin === mainIng.kin).map((i) => i.slug);
+    const kin = collect((r) => kinSlugs.some((k) => r.allSlugs.includes(k)), 'akraba');
+    if (kin.length) return kin.slice(0, limit);
+  }
+
+  /**
+   * 3. Kategori düşüşü.
+   *
+   * Akrabası da yoksa aynı malzeme kategorisinden tarifler: bıldırcın için
+   * kümes hayvanı tarifleri. "Aynı yemek" değil ama "aynı teknik" — ve boş
+   * ekrandan iyi.
+   */
+  if (mainIng) {
+    const sameCat = new Set(
+      INGREDIENTS.filter((i) => i.category === mainIng.category).map((i) => i.slug),
+    );
+
+    /**
+     * Kategori kademesinde "içinde geçiyor" yetmiyor. İlk hâli lakerda için
+     * "Sucuklu Yumurta" döndürüyordu: yumurta da protein kategorisinde ve
+     * tarifte geçiyor. Oysa aranan şey aynı kategorinin **başrolde olduğu**
+     * bir tarif. O yüzden ölçüt, o kategorinin tabaktaki gram payı.
+     */
+    const share = (r: Recipe): number => {
+      let mine = 0;
+      let all = 0;
+      for (const c of r.components) {
+        for (const i of c.ingredients) {
+          all += i.grams;
+          if (sameCat.has(i.slug)) mine += i.grams;
+        }
+      }
+      return all > 0 ? mine / all : 0;
+    };
+
+    const cat = collect((r) => share(r) >= 0.25, 'kategori').sort(
+      (a, b) => b.shared - a.shared || share(b.recipe) - share(a.recipe),
+    );
+    if (cat.length) return cat.slice(0, limit);
+  }
+
+  return [];
+}
+
+/** Ana malzemenin korpusta kaç tarifi var — Lab'de "hazır tarifi yok" uyarısı için. */
+export function recipeCountFor(slug: string): number {
+  let n = 0;
+  for (const r of RECIPES) if (r.allSlugs.includes(slug)) n += 1;
+  return n;
 }
 
 // ── Aramadan tavsiye ───────────────────────────────────────────────

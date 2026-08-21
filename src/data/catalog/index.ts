@@ -30,6 +30,7 @@ import { BAHARAT_SIVI } from './baharat-sivi';
 import { EK_MALZEME, ITHAL_EK } from './ek-malzeme';
 import { FAMILY_COMPOUNDS } from './bilesik-eslesme';
 import { CLASSIC_PAIRS } from './gelenek';
+import { NPMI_PAIRS } from './npmi-tr';
 import { HAYVANSAL } from './hayvansal';
 import { KURU_GIDA } from './kuru-gida';
 import { MEYVE } from './meyve';
@@ -137,8 +138,20 @@ export const compoundSource = (slug: string) => sources.get(slug) ?? 'aile';
 
 const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
+/**
+ * Kültürel önsel iki katmandan geliyor ve sıra önemli.
+ *
+ *  1. `npmi-tr.ts` — 3.481 Türk tarifinden hesaplanan birlikte geçme
+ *     istatistiği. Geniş ama kaba: "bu ikisi sık sık aynı tarifte" diyor.
+ *  2. `gelenek.ts` — elle kürate edilmiş 388 çift. Dar ama keskin: "bu ikisi
+ *     olmadan o yemek olmaz" diyor.
+ *
+ * Elle yazılan SONRA yükleniyor ve istatistiği eziyor. Sebebi ölçüldü:
+ * ikisi korele çıkmadı. Kuzu ile kuru nane ikonik ama korpusta kuzu tarifi
+ * az; istatistik onu göremez, kürasyon bilir.
+ */
 const PRIORS = new Map<string, number>();
-for (const [slugA, slugB, strength] of CLASSIC_PAIRS) {
+for (const [slugA, slugB, strength] of [...NPMI_PAIRS, ...CLASSIC_PAIRS]) {
   const a = BY_SLUG.get(slugA);
   const b = BY_SLUG.get(slugB);
   if (!a) throw new Error(`gelenek.ts: bilinmeyen malzeme "${slugA}"`);

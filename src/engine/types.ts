@@ -325,6 +325,15 @@ export interface EngineOptions {
   /** Sert filtre — hiçbir skor bunu geçemez. */
   excludeAllergens?: string[];
   excludeIngredientIds?: number[];
+  /**
+   * Listeden çıkarılmayan ama geri plana atılan malzemeler.
+   *
+   * Uyum tablosunun (`uyum.ts`) ikinci kademesi: ana malzemenin kurduğu
+   * yemek türünde seyrek görülen malzemeler. Elemek fazla sert olurdu —
+   * antrikot ile biberiye Türk korpusunda nadir ama iyi bir eşleşme.
+   * Skora ceza uygulanıyor, aday listede kalıyor.
+   */
+  demoteIngredientIds?: number[];
   requireDietTags?: string[];
   /** Yalnızca bu rollerdeki adaylar. */
   allowedRoles?: IngredientRole[];

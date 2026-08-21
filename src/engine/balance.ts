@@ -63,7 +63,7 @@ export const ARCHETYPES: Record<ArchetypeId, Archetype> = {
   },
   'dumanli-izgara': {
     id: 'dumanli-izgara',
-    labelTr: 'Dumanlı ızgara',
+    labelTr: 'Izgara ve mangal',
     description: 'Kömür ve is notası. Tuz yüksek, ekşilik yağı keser.',
     target: v(2.5, 4.5, 5.5, 3, 7, 5, 3),
     tolerance: 1.8,
@@ -277,8 +277,26 @@ export function evaluateBalance(
   const distanceBefore = tasteDistance(before, spec.target, spec.axisWeights);
   const distanceAfter = tasteDistance(after, spec.target, spec.axisWeights);
 
-  const gain =
-    distanceBefore <= 1e-6 ? 0 : clamp01((distanceBefore - distanceAfter) / distanceBefore);
+  /**
+   * Kazanç **işaretli** — hedeften uzaklaştıran aday ceza alıyor.
+   *
+   * Önce `clamp01` ile sıfıra kırpılıyordu ve bunun iki sonucu vardı:
+   *
+   *  1. Uzaklaştıran aday ceza almıyor, sadece prim alamıyordu. Aroma ve
+   *     gelenek terimleri onu yine tepeye taşıyabiliyordu — kremalı bir
+   *     sosa vanilya, tatlı-ekşi bir sosa dereotu böyle geliyordu.
+   *  2. `optimizeDose` bütün zararlı dozları sıfırda eşit görüyor ve ilk
+   *     denediğini seçiyordu. İşaretliyken en az zararlı dozu seçiyor.
+   *
+   * Katalog genelinde ölçüldü (`npm run denetim:oneri`): kırpılı hâlde
+   * ilk üç önerinin %2,4'ü tabağı hedeften uzaklaştırıyordu ve bunların
+   * 214'ü sosun aromatik adımındaydı.
+   *
+   * Alt sınır −1: uzaklaşma ne kadar büyük olursa olsun ceza tek bir
+   * terimi domine etmesin.
+   */
+  const ratio = distanceBefore <= 1e-6 ? 0 : (distanceBefore - distanceAfter) / distanceBefore;
+  const gain = Math.max(-1, Math.min(1, ratio));
 
   const moved: AxisMove[] = [];
   const overshoot: BalanceEvaluation['overshoot'] = [];

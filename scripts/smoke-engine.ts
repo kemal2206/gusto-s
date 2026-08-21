@@ -20,7 +20,7 @@ import {
   type DishState,
   type SuggestionLink,
 } from '../src/engine';
-import { CHARACTERS, ROLE_STEPS } from '../src/lib/lab-flow';
+import { CHARACTERS, ROLE_STEPS, rolesOf } from '../src/lib/lab-flow';
 
 console.log('\n════ KATALOG ════');
 console.log(`  ${CATALOG_STATS.ingredients} malzeme`);
@@ -64,10 +64,10 @@ function walkChain(mainSlug: string, characterIndex: number) {
       mode: 'benzerlik',
       weights: CHAIN_WEIGHTS,
       focusAxes: character.focusAxes,
-      allowedRoles: step.roles,
+      allowedRoles: rolesOf(step),
       anchorIngredientId: last.ingredient.id,
-      doseBounds: step.doseRange,
-      fixedGrams: step.fixedGrams,
+      doseBounds: step.slots[0].doseRange,
+      fixedGrams: step.slots[0].fixedGrams,
       requireLink: true,
       limit: 4,
     });
@@ -89,7 +89,7 @@ function walkChain(mainSlug: string, characterIndex: number) {
     picks.push({
       ingredient: chosen.ingredient,
       grams: chosen.suggestedGrams,
-      role: step.roles[0],
+      role: rolesOf(step)[0],
       accompaniment: step.accompaniment,
     });
     console.log(`\n   → seçildi: ${chosen.ingredient.nameTr}`);

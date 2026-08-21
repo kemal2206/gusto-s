@@ -37,7 +37,7 @@ export function IngredientAvatar({ ingredient, size = 40 }: IngredientAvatarProp
         />
       ) : (
         <Image
-          source={{ uri: `https://loremflickr.com/100/100/ingredient,food?random=${ingredient.slug}` }}
+          source={{ uri: `https://picsum.photos/seed/${ingredient.slug}/100/100` }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           contentFit="cover"
           transition={120}

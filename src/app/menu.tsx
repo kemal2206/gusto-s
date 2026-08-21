@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Clock, Flame, RefreshCw, Users } from 'lucide-react-native';
+import { Check, Clock, Flame, RefreshCw, ShoppingBasket, Users } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import { OptionCard } from '@/components/ui/option-card';
 import { Text } from '@/components/ui/text';
 import { BY_SLUG } from '@/data/catalog';
 import { buildMenu, type MenuAnswers } from '@/lib/menu-builder';
+import { shoppableFor } from '@/lib/sepet';
+import { useGrocery } from '@/lib/store/grocery';
 import { useProfile, useProfileFilter } from '@/lib/store/profile';
 import { eaterCount } from '@/lib/profile-model';
 import { palette, radius, spacing, tabularNums } from '@/theme/tokens';
@@ -103,6 +105,43 @@ export default function MenuScreen() {
     return buildMenu({ ...(answers as MenuAnswers), kisi: people }, profileFilter, seed);
   }, [finished, answers, people, profileFilter, seed]);
 
+  /**
+   * Menünün sepete gidişi.
+   *
+   * Her tabak sepete **kendi adıyla** giriyor, "Menü" diye tek bir kalemle
+   * değil. İki nedeni var: sepette hangi malzemenin hangi tabak için
+   * alındığı yazıyor, ve tabaklardan birini pişirdiğinde yalnızca onun payı
+   * düşüyor. Miktarlar hanenin kişi sayısına ölçekli — tarif sayfasında
+   * göreceğiyle aynı sayı.
+   */
+  const basket = useGrocery((s) => s.items);
+  const addGrocery = useGrocery((s) => s.addMany);
+
+  const menuLines = (menu?.courses ?? []).map((c) => ({
+    title: c.recipe.title,
+    lines: shoppableFor(c.recipe, people),
+  }));
+
+  const missingCount = menuLines.reduce(
+    (total, course) =>
+      total +
+      course.lines.filter(
+        (l) =>
+          !basket.some(
+            (b) => b.slug === l.slug && b.sources.some((s) => s.recipe === course.title),
+          ),
+      ).length,
+    0,
+  );
+
+  const addMenuToBasket = () => {
+    if (missingCount === 0) {
+      router.push('/sepet');
+      return;
+    }
+    for (const course of menuLines) addGrocery(course.title, course.lines);
+  };
+
   if (finished) {
     return (
       <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
@@ -168,6 +207,27 @@ export default function MenuScreen() {
                   </Pressable>
                 );
               })}
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  missingCount === 0
+                    ? 'Sofranın malzemeleri sepette. Sepeti aç.'
+                    : `Sofranın ${missingCount} malzemesini sepete ekle`
+                }
+                onPress={addMenuToBasket}
+                style={({ pressed }) => [styles.toBasket, pressed && { opacity: 0.85 }]}>
+                {missingCount === 0 ? (
+                  <Check size={18} color={palette.surface} />
+                ) : (
+                  <ShoppingBasket size={18} color={palette.surface} />
+                )}
+                <Text variant="button" tone="inverse">
+                  {missingCount === 0
+                    ? 'Sofra sepette — sepeti aç'
+                    : `${missingCount} malzemeyi sepete ekle`}
+                </Text>
+              </Pressable>
 
               <Pressable
                 accessibilityRole="button"
@@ -310,6 +370,17 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
+  /** Sofranın asıl devamı sepet — bu yüzden dolu, "başka sofra kur" ise çerçeveli. */
+  toBasket: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 56,
+    borderRadius: radius.md,
+    backgroundColor: palette.brand,
+    marginTop: spacing.lg,
+  },
   again: {
     flexDirection: 'row',
     alignItems: 'center',

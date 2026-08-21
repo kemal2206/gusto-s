@@ -12,12 +12,22 @@ import { OptionCard } from '@/components/ui/option-card';
 import { Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { BY_SLUG, INGREDIENTS, LOOKUP } from '@/data/catalog';
-import { COMPONENT_LABELS_TR, METHOD_LABELS_TR } from '@/data/recipes';
-import type { ArchetypeId, DishComponent, DishState, Ingredient, IngredientRole } from '@/engine';
-import { ARCHETYPES, CHAIN_WEIGHTS, suggestAdditions } from '@/engine';
+import { COMPONENT_LABELS_TR, METHOD_LABELS_TR, type CookMethod } from '@/data/recipes';
+import type {
+  ArchetypeId,
+  DishComponent,
+  DishState,
+  Ingredient,
+  IngredientRole,
+  Suggestion,
+} from '@/engine';
+import { ARCHETYPES, CHAIN_WEIGHTS, ROLE_LABELS_TR, suggestAdditions } from '@/engine';
 import {
-  CHARACTERS,
   CHARACTER_BY_ARCHETYPE,
+  TASTES,
+  TASTE_BY_ID,
+  bodiesFor,
+  planFor,
   COMPONENT_ORDER,
   COMPONENT_PLANS,
   MAIN_GROUPS,
@@ -26,6 +36,9 @@ import {
   type MainGroup,
 } from '@/lib/lab-flow';
 import { recipesForPicks } from '@/lib/recipe-filter';
+import { buildLabRecipe, findGap, type LabComponentLite } from '@/lib/lab-tarif';
+import { suggestForStep } from '@/lib/lab-oneri';
+import { nutritionOf } from '@/lib/recipe-facts';
 import { useHistory } from '@/lib/store/history';
 import { useTabReset } from '@/lib/use-tab-reset';
 import { palette, radius, spacing, tabularNums } from '@/theme/tokens';
@@ -53,16 +66,33 @@ interface LabPick extends DishComponent {
 interface LabComponent {
   planId: ComponentPlanId;
   archetypeId: ArchetypeId;
+  /**
+   * Pişirme yöntemi. Planın varsayılanıyla başlıyor ama karakter seçimi
+   * söylüyorsa ona dönüyor — "Izgara ve mangal" seçen kişinin tabağı
+   * tavada pişemez.
+   */
+  method: CookMethod;
   picks: LabPick[];
   stepIndex: number;
 }
 
-type Phase = 'grup' | 'ana' | 'karakter' | 'rol' | 'bilesen' | 'bilesen-hedef' | 'ozet';
+/** Karakterin söylediği yöntem varsa o, yoksa planın kendi yöntemi. */
+const methodFor = (planId: ComponentPlanId, archetypeId: ArchetypeId): CookMethod =>
+  CHARACTER_BY_ARCHETYPE.get(archetypeId)?.method ?? COMPONENT_PLANS[planId].method;
+
+type Phase = 'grup' | 'ana' | 'tat' | 'govde' | 'rol' | 'bilesen' | 'bilesen-hedef' | 'ozet';
 
 export default function LabScreen() {
   const params = useLocalSearchParams<{ grup?: string; slugs?: string; ana?: string }>();
 
   const [phase, setPhase] = useState<Phase>('grup');
+  /**
+   * Seçilen tat. Gövde seçenekleri buna göre daralıyor ve sos bileşeninin
+   * gerekip gerekmediğini bu belirliyor.
+   */
+  const [tasteId, setTasteId] = useState<string | null>(null);
+  /** Ana yemek bitince otomatik açılacak sos hedefi. */
+  const [pendingSauce, setPendingSauce] = useState<ArchetypeId | null>(null);
   const [group, setGroup] = useState<MainGroup | null>(null);
   const [slugFilter, setSlugFilter] = useState<string[] | null>(null);
   const [components, setComponents] = useState<LabComponent[]>([]);
@@ -110,22 +140,62 @@ export default function LabScreen() {
   const lastPick = active?.picks[active.picks.length - 1];
   const character = active ? CHARACTER_BY_ARCHETYPE.get(active.archetypeId) : undefined;
 
-  const suggestions = useMemo(() => {
-    if (phase !== 'rol' || !active || !step) return [];
-    return suggestAdditions(dish, INGREDIENTS, LOOKUP, {
-      mode: 'benzerlik',
-      weights: CHAIN_WEIGHTS,
-      focusAxes: character?.focusAxes,
-      allowedRoles: step.roles,
-      anchorIngredientId: lastPick?.ingredient.id,
-      doseBounds: step.doseRange,
-      fixedGrams: step.fixedGrams,
-      requireLink: true,
-      limit: 6,
-    });
-  }, [phase, active, step, dish, lastPick, character]);
+  /**
+   * Denge hesabında 4× ağırlık alan eksenler.
+   *
+   * Eskiden bunlar arketipten geliyordu ve kullanıcının tat seçiminin aday
+   * havuzuna hiçbir etkisi yoktu — ölçüldü, dört karakter de neredeyse aynı
+   * altı malzemeyi öneriyordu. Artık doğrudan tat cevabından geliyor:
+   * "tatlı-ekşi" diyen kişinin sosunda tatlılık ve ekşilik eksenleri ağır
+   * basıyor, "acılı" diyenin ana yemeğinde acılık.
+   */
+  const focusAxes = tasteId ? TASTE_BY_ID.get(tasteId)?.focusAxes : character?.focusAxes;
+
+  /**
+   * Tabağın ana malzemesi — uyum tablosunun çıpası.
+   *
+   * Uyum, seçilenlerin tamamına değil ana malzemeye göre hesaplanıyor:
+   * "antrikotun kurduğu türden yemeklerde bu malzeme geçiyor mu?" Zincir
+   * kuralı bunu yakalayamıyordu çünkü tereyağı evrensel bir bağlayıcı ve
+   * her şey onun üzerinden listeye giriyordu — tarhana dâhil.
+   */
+  const mainSlug = components[0]?.picks.find((p) => p.role === 'ana')?.ingredient.slug;
 
   const stepPicks = active?.picks.filter((p) => p.stepId === step?.id) ?? [];
+
+  const suggestions = useMemo(() => {
+    if (phase !== 'rol' || !active || !step) return [];
+    return suggestForStep({
+      dish,
+      step,
+      stepPicks,
+      mainSlug,
+      cuisine: 'tr',
+      focusAxes,
+      anchorIngredientId: lastPick?.ingredient.id,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, active, step, dish, lastPick, focusAxes, mainSlug, stepPicks.length]);
+
+  /**
+   * Adayı ikiden az olan küme sessizce atlanıyor.
+   *
+   * Levrek + "sade" akışında baharat adımında **tek aday** kalıyordu ve o da
+   * gochujang'dı — uyum vetosu diğerlerini elemiş, geriye Kore biber ezmesi
+   * kalmıştı. Tek seçenekli bir adım zaten soru değil.
+   */
+  /**
+   * `active` ve `step` yokken `suggestions` zaten boş dönüyor; o anı "aday
+   * yok" sanıp adımı atlarsak ekranlar zincirleme atlanıyor ve kullanıcı
+   * doğrudan özete düşüyor. İlk hâli tam olarak bunu yapıyordu — dört
+   * kümenin dördü de atlandı. Koşula açıkça ikisini de ekliyoruz.
+   */
+  const stepTooThin =
+    phase === 'rol' && Boolean(active) && Boolean(step) && stepPicks.length === 0 && suggestions.length < 2;
+  useEffect(() => {
+    if (stepTooThin) advanceStep();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepTooThin, step?.id, activeIndex]);
 
   /** Kurulan tabağın gerçek dünyadaki karşılıkları — her adımda güncelleniyor. */
   const allPickedSlugs = components.flatMap((c) => c.picks.map((p) => p.ingredient.slug));
@@ -133,6 +203,39 @@ export default function LabScreen() {
     () => recipesForPicks(allPickedSlugs, 10),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allPickedSlugs.join(',')],
+  );
+
+  /**
+   * Kurulan tabağın kendi yapılışı.
+   *
+   * Lab yeni bir yemek kurduruyor; o yemeğin tarifi hiçbir korpusta yok
+   * çünkü kullanıcı onu az önce icat etti. Adımlar bileşenin yöntemi ve
+   * her seçimin rolünden üretiliyor (`lab-tarif.ts`).
+   */
+  const labComponents: LabComponentLite[] = components.map((c) => ({
+    kind: COMPONENT_PLANS[c.planId].kind,
+    method: c.method,
+    archetypeId: c.archetypeId,
+    picks: c.picks.map((p) => ({ ingredient: p.ingredient, grams: p.grams, role: p.role })),
+  }));
+  const built = useMemo(
+    () => buildLabRecipe(labComponents, 2),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allPickedSlugs.join(','), components.map((c) => c.archetypeId).join(',')],
+  );
+
+  /**
+   * Hedefe ulaşıldı mı? Kullanıcı "tatlı ekşi" seçip düz bir et kurduysa
+   * o tabak tek başına hedefe ulaşamaz — bir sos gerekiyor ve bunu
+   * söylemek gerekiyor.
+   */
+  const gap = useMemo(
+    () =>
+      built && active
+        ? findGap(built.profile, active.archetypeId, components.some((c) => COMPONENT_PLANS[c.planId].kind === 'sos'))
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [built?.profile, active?.archetypeId, components.length],
   );
 
   const totalSteps = 3 + components.reduce((n, c) => n + COMPONENT_PLANS[c.planId].steps.length, 0);
@@ -150,17 +253,42 @@ export default function LabScreen() {
       {
         planId: 'ana',
         archetypeId: 'doyurucu-derin',
+        method: methodFor('ana', 'doyurucu-derin'),
         stepIndex: 0,
         picks: [{ ingredient: main, grams: 250, role: 'ana', stepId: 'ana' }],
       },
     ]);
     setActiveIndex(0);
-    setPhase('karakter');
+    setTasteId(null);
+    setPhase('tat');
   }
+
+  /**
+   * Tat ve gövde cevaplarını tek plana çevirip uyguluyor.
+   *
+   * Sos gerekiyorsa hemen açılmıyor: önce ana yemek kuruluyor, ana yemeğin
+   * adımları bitince sos bileşeni kendiliğinden devreye giriyor. Sıra
+   * önemli — sosun hedefi ana yemeğin yağını kesmek ve motor bunu
+   * `pairedWith` üzerinden hesaplıyor, yani sos kurulurken ana yemeğin
+   * içeriği bilinmek zorunda.
+   */
+  const applyPlan = (tid: string, bodyId: string) => {
+    const p = planFor(tid, bodyId);
+    if (!p) return;
+    setComponents((prev) =>
+      prev.map((c, i) =>
+        i === 0 ? { ...c, archetypeId: p.mainArchetype, method: p.method } : c,
+      ),
+    );
+    setPendingSauce(p.sauceArchetype ?? null);
+    setPhase('rol');
+  };
 
   const setArchetype = (id: ArchetypeId) =>
     setComponents((prev) =>
-      prev.map((c, i) => (i === activeIndex ? { ...c, archetypeId: id } : c)),
+      prev.map((c, i) =>
+        i === activeIndex ? { ...c, archetypeId: id, method: methodFor(c.planId, id) } : c,
+      ),
     );
 
   const addPick = (p: LabPick) =>
@@ -181,13 +309,23 @@ export default function LabScreen() {
       setComponents((prev) =>
         prev.map((c, i) => (i === activeIndex ? { ...c, stepIndex: c.stepIndex + 1 } : c)),
       );
+    } else if (pendingSauce && activeIndex === 0) {
+      /**
+       * Tat seçimi sos gerektiriyordu; "başka bileşen ekleyelim mi?" diye
+       * sormuyoruz çünkü seçenek yok — o tada başka türlü ulaşılmıyor.
+       */
+      startComponent('sos', pendingSauce);
+      setPendingSauce(null);
     } else {
       setPhase('bilesen');
     }
   };
 
   const startComponent = (planId: ComponentPlanId, archetypeId: ArchetypeId) => {
-    setComponents((prev) => [...prev, { planId, archetypeId, stepIndex: 0, picks: [] }]);
+    setComponents((prev) => [
+      ...prev,
+      { planId, archetypeId, method: methodFor(planId, archetypeId), stepIndex: 0, picks: [] },
+    ]);
     setActiveIndex(components.length);
     setPendingPlan(null);
     setPhase('rol');
@@ -200,6 +338,8 @@ export default function LabScreen() {
     setSlugFilter(null);
     setComponents([]);
     setActiveIndex(0);
+    setTasteId(null);
+    setPendingSauce(null);
   };
 
   // Sekmeye basınca laboratuvarı baştan başlat.
@@ -213,8 +353,9 @@ export default function LabScreen() {
       setComponents((prev) =>
         prev.map((c, i) => (i === activeIndex ? { ...c, stepIndex: c.stepIndex - 1 } : c)),
       );
-    } else if (phase === 'rol') setPhase(activeIndex === 0 ? 'karakter' : 'bilesen');
-    else if (phase === 'karakter') setPhase('ana');
+    } else if (phase === 'rol') setPhase(activeIndex === 0 ? 'govde' : 'bilesen');
+    else if (phase === 'govde') setPhase('tat');
+    else if (phase === 'tat') setPhase('ana');
     else if (phase === 'ana') setPhase('grup');
   };
 
@@ -243,7 +384,7 @@ export default function LabScreen() {
               description={g.hintTr}
               icon={
                 <Image
-                  source={{ uri: `https://loremflickr.com/100/100/food,dish,${g.id}?random=${g.id}` }}
+                  source={{ uri: `https://picsum.photos/seed/${g.id}/100/100` }}
                   style={{ width: 48, height: 48, borderRadius: 24 }}
                 />
               }
@@ -281,23 +422,57 @@ export default function LabScreen() {
   }
 
   // ── 03 · Ana yemeğin karakteri ────────────────────────────────────
-  if (phase === 'karakter' && active) {
+  // ── 03 · Tat ──────────────────────────────────────────────────────
+  if (phase === 'tat' && active) {
     const main = active.picks[0]?.ingredient;
     return (
       <Screen progress={progress} footer={<Button label="Geri" variant="quiet" onPress={goBack} />}>
-        <Head index="03" eyebrow={main?.nameTr ?? 'Karakter'} question="Nasıl bir tat olsun?"
-          hint="Bu seçim ana yemeğin hedef tat profilini belirliyor." ingredient={main} />
+        <Head index="03" eyebrow={main?.nameTr ?? 'Tat'} question="Nasıl bir tat olsun?"
+          hint="Bu seçim yemeğin ne olacağını belirliyor — bazı tatlar yanına bir sos gerektiriyor."
+          ingredient={main} />
         <View style={styles.list}>
-          {CHARACTERS.filter((c) => COMPONENT_PLANS.ana.archetypes.includes(c.archetypeId)).map(
-            (c) => (
-              <OptionCard key={c.archetypeId} title={c.labelTr} description={c.hintTr}
-                selected={active.archetypeId === c.archetypeId}
-                onPress={() => {
-                  setArchetype(c.archetypeId);
-                  setPhase('rol');
-                }} />
-            ),
-          )}
+          {TASTES.map((t) => (
+            <OptionCard key={t.id} title={t.labelTr} description={t.hintTr}
+              selected={tasteId === t.id}
+              onPress={() => {
+                setTasteId(t.id);
+                setPhase('govde');
+              }} />
+          ))}
+        </View>
+      </Screen>
+    );
+  }
+
+  // ── 04 · Gövde ────────────────────────────────────────────────────
+  if (phase === 'govde' && active && tasteId) {
+    const main = active.picks[0]?.ingredient;
+    const taste = TASTE_BY_ID.get(tasteId);
+    return (
+      <Screen progress={progress} footer={<Button label="Geri" variant="quiet" onPress={goBack} />}>
+        <Head index="04" eyebrow={taste?.labelTr ?? ''} question="Nasıl bir yemek olsun?"
+          hint="Bu seçim pişirme yöntemini belirliyor." ingredient={main} />
+
+        {/**
+          * Sos gerekiyorsa burada söyleniyor. Sorulmuyor çünkü seçenek yok:
+          * et kendi başına tatlı-ekşi ya da kremalı olamaz, o tada başka
+          * türlü ulaşılmıyor.
+          */}
+        {taste?.sauce ? (
+          <View style={styles.gapCard}>
+            <Eyebrow index="+">Yanına sos</Eyebrow>
+            <Text variant="body" style={{ lineHeight: 21 }}>
+              {`${taste.labelTr.replace(' olsun', '')} bir tabak için ana malzemenin yanına bir sos kurulacak — ` +
+                'ana yemeği seçtikten sonra sosun malzemelerini de birlikte seçeceğiz.'}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.list}>
+          {bodiesFor(tasteId).map((b) => (
+            <OptionCard key={b.id} title={b.labelTr} description={b.hintTr}
+              onPress={() => applyPlan(tasteId, b.id)} />
+          ))}
         </View>
       </Screen>
     );
@@ -326,10 +501,25 @@ export default function LabScreen() {
 
         <ComponentStrip components={components} activeIndex={activeIndex} onRemove={removePick} />
 
+        {gap?.suggestKind ? (
+          <View style={styles.gapCard}>
+            <Eyebrow index="!">Hedefe ulaşmak için</Eyebrow>
+            <Text variant="body" style={{ lineHeight: 21 }}>
+              {gap.messageTr}
+            </Text>
+          </View>
+        ) : null}
+
         {matchingRecipes.length ? (
           <RecipeRail
-            title="Buna benzeyen tarifler"
-            hint={`Seçtiğin malzemeleri kullanan ${matchingRecipes.length} tarif`}
+            title={matchingRecipes[0].level === 'tam' ? 'Buna benzeyen tarifler' : 'Yakın tarifler'}
+            hint={
+              matchingRecipes[0].level === 'tam'
+                ? `Seçtiğin malzemeleri kullanan ${matchingRecipes.length} tarif`
+                : matchingRecipes[0].level === 'akraba'
+                  ? 'Bu malzemenin hazır tarifi yok; en yakın akrabasının tarifleri'
+                  : 'Bu malzemenin hazır tarifi yok; aynı türden tarifler'
+            }
             recipes={matchingRecipes.map((m) => m.recipe)}
           />
         ) : null}
@@ -354,7 +544,7 @@ export default function LabScreen() {
                       addPick({
                         ingredient: s.ingredient,
                         grams: s.suggestedGrams,
-                        role: step.roles[0] as IngredientRole,
+                        role: s.slotRole,
                         stepId: step.id,
                       });
                     }
@@ -440,7 +630,7 @@ export default function LabScreen() {
               {`${COMPONENT_LABELS_TR[p.kind]} · ${ARCHETYPES[c.archetypeId].labelTr}`}
             </Eyebrow>
             <Text variant="caption" tone="muted">
-              {METHOD_LABELS_TR[p.method]}
+              {METHOD_LABELS_TR[c.method]}
             </Text>
             {c.picks.map((pick) => (
               <View key={pick.ingredient.id} style={styles.row}>
@@ -457,21 +647,61 @@ export default function LabScreen() {
         );
       })}
 
+      {/**
+        * Kurduğun tabağın yapılışı. Hazır bir tariften kopyalanmıyor —
+        * bileşenin yöntemi ve her malzemenin rolünden üretiliyor.
+        */}
+      {built ? (
+        <View style={styles.card}>
+          <Eyebrow index="→">Nasıl yapılır</Eyebrow>
+          <Text variant="bodyStrong" style={{ fontSize: 20, marginBottom: 4 }}>
+            {built.recipe.title}
+          </Text>
+          <Text variant="caption" tone="muted" style={{ marginBottom: 12 }}>
+            {built.recipe.totalMinutes} dakika · {built.recipe.servings} kişilik ·
+            {' '}
+            {nutritionOf(built.recipe).kcal} kcal (porsiyon başına tahmini)
+          </Text>
+
+          {built.recipe.components.map((comp, ci) => (
+            <View key={ci} style={{ marginTop: ci ? 20 : 0 }}>
+              {built.recipe.components.length > 1 ? (
+                <Text variant="label" style={styles.stepGroup}>
+                  {`${COMPONENT_LABELS_TR[comp.kind].toLocaleUpperCase('tr-TR')} · ${comp.title}`}
+                </Text>
+              ) : null}
+              {comp.steps.map((st, si) => (
+                <View key={si} style={styles.stepRow}>
+                  <Text variant="label" tone="muted" style={styles.stepNo}>
+                    {si + 1}
+                  </Text>
+                  <Text variant="body" style={styles.stepText}>
+                    {st}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+
+          {gap && !gap.suggestKind ? (
+            <Text variant="caption" tone="muted" style={{ marginTop: 14, lineHeight: 18 }}>
+              {gap.messageTr}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {matchingRecipes.length ? (
         <RecipeRail
-          title="Buna en çok benzeyen tarifler"
-          hint="Kurduğun malzemeleri paylaşan, adımları yazılı tarifler"
+          title="Yakın duran hazır tarifler"
+          hint={
+            matchingRecipes[0].level === 'tam'
+              ? 'Kurduğun malzemeleri paylaşan tarifler — karşılaştırmak istersen'
+              : 'Birebir eşleşen tarif yok; en yakın duranlar'
+          }
           recipes={matchingRecipes.map((m) => m.recipe)}
         />
-      ) : (
-        <Text variant="caption" tone="muted">
-          Kurduğun kombinasyonu paylaşan hazır tarif bulunamadı — özgün bir tabak kurmuşsun.
-        </Text>
-      )}
-
-      <Text variant="caption" tone="muted">
-        Lab kompozisyonu kuruyor; pişirme adımları hazır tariflerden gelir.
-      </Text>
+      ) : null}
     </Screen>
   );
 }
@@ -546,6 +776,19 @@ function Head({
 }
 
 const styles = StyleSheet.create({
+  gapCard: {
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#fdf6ec',
+    borderWidth: 1,
+    borderColor: '#e8d9bd',
+    gap: 8,
+    marginBottom: 8,
+  },
+  stepGroup: { marginBottom: 8, letterSpacing: 0.6 },
+  stepRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  stepNo: { minWidth: 18, paddingTop: 2 },
+  stepText: { flex: 1, lineHeight: 22 },
   head: { gap: spacing.md, paddingBottom: spacing.xs },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   headBody: { flex: 1, gap: 3 },

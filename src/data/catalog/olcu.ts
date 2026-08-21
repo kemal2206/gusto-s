@@ -17,9 +17,13 @@ import { densityOf, PIECE_G } from './ev-olcusu';
 
 /** Hacim ölçüleri — ml. Grama çevirmek için yoğunluk gerekiyor. */
 export const UNIT_ML: Record<string, number> = {
-  ml: 1, litre: 1000, lt: 1000,
+  ml: 1, litre: 1000, lt: 1000, cl: 10, mililitre: 1, santilitre: 10,
   'su bardağı': 200, 'çay bardağı': 100, 'kahve fincanı': 60, bardak: 200,
   'yemek kaşığı': 15, 'tatlı kaşığı': 7, 'çay kaşığı': 5, kaşık: 15,
+  // "çorba kaşığı" yemek kaşığının başka adı — yemek.com korpusunda geçiyor.
+  'çorba kaşığı': 15,
+  // yemek.com korpusunda geçen, tabloda olmayan hacimler.
+  kase: 300,
 };
 
 /** Doğrudan gram olan ölçüler — yoğunluktan bağımsız. */
@@ -27,6 +31,13 @@ export const UNIT_G: Record<string, number> = {
   gr: 1, gram: 1, g: 1, kilo: 1000, kg: 1000,
   tutam: 0.5, pençik: 1.5, diş: 4, demet: 60, dilim: 25, damla: 0.05, sap: 10,
   paket: 10, avuç: 30, fiske: 0.5,
+  /**
+   * yemek.com korpusunda geçenler. `dal` maydanoz/nane sapı, `baş` bütün
+   * sarımsak, `yaprak` defne yaprağı — üçü de küçük ve `adet` varsayımına
+   * düşerse (sebze için 120 g) tarifi zehirliyorlar: "2 dal maydanoz"
+   * 240 g maydanoz oluyordu.
+   */
+  dal: 10, çimdik: 0.5, yaprak: 2, baş: 40, kutu: 400,
 };
 
 export const CAT_PIECE_G: Record<string, number> = {

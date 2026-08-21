@@ -8,6 +8,7 @@
 
 import { BY_SLUG } from '@/data/catalog';
 import { macrosFor, type Macros } from '@/data/catalog/besin';
+import { cookComponent } from '@/data/catalog/pisirme-donusum';
 import { CATEGORY_BY_ID, CUISINE_LABELS_TR, METHOD_LABELS_TR, type Recipe } from '@/data/recipes';
 
 // ── Besin değeri ───────────────────────────────────────────────────
@@ -15,32 +16,64 @@ import { CATEGORY_BY_ID, CUISINE_LABELS_TR, METHOD_LABELS_TR, type Recipe } from
 export interface Nutrition extends Macros {
   /** Porsiyon başına mı, tarifin tamamı mı. */
   perServing: boolean;
+  /** Rakam kaynağın kendisinden mi geliyor, bizim hesabımızdan mı. */
+  source?: 'kaynak' | 'hesap';
+  /** Porsiyonun pişmiş ağırlığı (g) — yalnızca hesaplanmışsa. */
+  cookedGrams?: number;
+  /** Tavada kalan ve damlayan yağ (g, tarifin tamamı) — yalnızca hesaplanmışsa. */
+  fatDiscarded?: number;
 }
 
 /**
  * Porsiyon başına besin değeri.
  *
- * Malzemelerin gram ağırlıklarıyla 100 g başına değerleri çarpılıp porsiyona
- * bölünüyor. Pişirme kaybı, yağ emilimi ve çeşit farkı hesaba katılmıyor —
- * bu yüzden arayüzde "tahmini" diye geçiyor.
+ * İki yol var ve sıra önemli:
+ *
+ *  1. **Kaynağından geliyorsa onu kullan.** `recipe.nutrition` doluysa o
+ *     tarif gerçekten ölçülmüş demektir; tahminimizi onun yerine koymayız.
+ *  2. **Boşsa hesapla.** Malzemelerin 100 g başına değerleri gramajla
+ *     çarpılıyor, sonra bileşenin pişirme yöntemine göre dönüştürülüyor
+ *     (`pisirme-donusum.ts`): damlayan yağ, dökülen haşlama suyu ve
+ *     kızartma tavasında kalan yağ düşülüyor.
+ *
+ * Hesap bileşen bileşen yapılıyor — ızgara etin yanındaki tavada sos aynı
+ * tabağın iki ayrı dönüşümü ve aynı katsayıları paylaşmıyorlar.
+ *
+ * Sonuç her hâlükârda **tahmindir** ve arayüzde öyle sunuluyor.
  */
 export function nutritionOf(recipe: Recipe): Nutrition {
+  if (recipe.nutrition) {
+    return { ...recipe.nutrition, perServing: true, source: 'kaynak' };
+  }
+
   let kcal = 0;
   let protein = 0;
   let carbs = 0;
   let fat = 0;
+  let cookedGrams = 0;
+  let fatDiscarded = 0;
 
   for (const c of recipe.components) {
-    for (const ri of c.ingredients) {
+    const items = c.ingredients.flatMap((ri) => {
       const ing = BY_SLUG.get(ri.slug);
-      if (!ing) continue;
-      const m = macrosFor(ri.slug, ing.category);
-      const k = ri.grams / 100;
-      kcal += m.kcal * k;
-      protein += m.protein * k;
-      carbs += m.carbs * k;
-      fat += m.fat * k;
-    }
+      if (!ing) return [];
+      return [
+        {
+          slug: ri.slug,
+          category: ing.category,
+          grams: ri.grams,
+          per100: macrosFor(ri.slug, ing.category),
+        },
+      ];
+    });
+
+    const cooked = cookComponent(items, c.method);
+    kcal += cooked.kcal;
+    protein += cooked.protein;
+    carbs += cooked.carbs;
+    fat += cooked.fat;
+    cookedGrams += cooked.cookedGrams;
+    fatDiscarded += cooked.fatDiscarded;
   }
 
   const s = Math.max(1, recipe.servings);
@@ -50,6 +83,9 @@ export function nutritionOf(recipe: Recipe): Nutrition {
     carbs: Math.round(carbs / s),
     fat: Math.round(fat / s),
     perServing: true,
+    source: 'hesap',
+    cookedGrams: Math.round(cookedGrams / s),
+    fatDiscarded: Math.round(fatDiscarded),
   };
 }
 

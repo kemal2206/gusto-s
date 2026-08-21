@@ -14,6 +14,7 @@ import { BY_SLUG } from '@/data/catalog';
 
 import { CATEGORY_BY_ID, DISH_CATEGORIES } from './kategoriler';
 import { ITHAL_TR } from './ithal-tr';
+import { ITHAL_YEMEKCOM } from './ithal-yemekcom';
 import { KOMSU_UZAKDOGU } from './komsu-uzakdogu';
 import { TR_CORBA_SULU } from './tr-corba-sulu';
 import { TR_ICECEK } from './tr-icecek';
@@ -27,12 +28,21 @@ const RAW = [
   ...TR_IZGARA_DENIZ,
   ...TR_SEBZE_HAMUR,
   ...KOMSU_UZAKDOGU,
+  ...ITHAL_YEMEKCOM,
   ...ITHAL_TR,
 ];
 
 /**
- * Aynı yemek hem elle yazıldıysa hem korpustan geldiyse ELLE yazılan kazanır:
- * onlar çok bileşenli ve kürate edilmiş. Sıra RAW dizisinde belirleniyor.
+ * Aynı yemek birden çok kaynakta varsa sıra RAW dizisinde belirleniyor,
+ * önce gelen kazanıyor:
+ *
+ *  1. **Elle yazılanlar** — çok bileşenli ve kürate edilmiş, hepsinin önünde.
+ *  2. **yemek.com** — özeti, porsiyonu ve fotoğrafı gerçek.
+ *  3. **nefisyemektarifleri** — en geniş korpus ama özeti ilk adımın kopyası,
+ *     porsiyonu neredeyse hep varsayılan ve fotoğrafı yok.
+ *
+ *  Yani "Mercimek Çorbası" her üçünde de varsa kullanıcı elle yazılanı,
+ *  yoksa fotoğraflı olanı görüyor.
  */
 const seenSlug = new Set<string>();
 export const DUPLICATES: string[] = [];

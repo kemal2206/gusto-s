@@ -15,6 +15,8 @@
 
 import type { IngredientCategory } from '@/engine';
 
+import { ITHAL_MACROS } from './besin-ithal';
+
 export interface Macros {
   /** kcal / 100 g */
   kcal: number;
@@ -176,6 +178,59 @@ export const INGREDIENT_MACROS: Record<string, Macros> = {
   nar: { kcal: 83, protein: 1.7, carbs: 19, fat: 1.2 },
   visne: { kcal: 50, protein: 1, carbs: 12, fat: 0.3 },
 
+  /**
+   * Kategori ortalamasının en çok yanıldığı malzemeler.
+   *
+   * `npm run kalibrasyon:tr` bunları gramajına göre sıralayıp buldu. En
+   * pahalısı et suyuydu: "diğer" ortalamasıyla 100 gramında 50 kcal
+   * sayılıyordu, gerçekte 10. Soğan çorbasında 1200 g et suyu geçiyor,
+   * yani porsiyona 120 kcal hayalet kalori biniyordu. Kestane kuruyemiş
+   * ortalamasına düşüp 600 kcal ve 18 g protein alıyordu — gerçekte 196
+   * kcal ve 1.9 g.
+   *
+   * Değerler USDA FoodData Central'ın tipik satırlarının yuvarlanmış hâli.
+   */
+  'et-suyu': { kcal: 10, protein: 1.5, carbs: 0.5, fat: 0.3 },
+  kestane: { kcal: 196, protein: 1.9, carbs: 44, fat: 1.3 },
+  susam: { kcal: 573, protein: 17.7, carbs: 23, fat: 50 },
+  'ay-cekirdegi': { kcal: 584, protein: 21, carbs: 20, fat: 51 },
+  'kuru-erik': { kcal: 240, protein: 2.2, carbs: 64, fat: 0.4 },
+  karpuz: { kcal: 30, protein: 0.6, carbs: 8, fat: 0.2 },
+  erik: { kcal: 46, protein: 0.7, carbs: 11, fat: 0.3 },
+  incir: { kcal: 74, protein: 0.8, carbs: 19, fat: 0.3 },
+  armut: { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 },
+  uzum: { kcal: 69, protein: 0.7, carbs: 18, fat: 0.2 },
+  kizilcik: { kcal: 46, protein: 0.4, carbs: 12, fat: 0.1 },
+  dut: { kcal: 43, protein: 1.4, carbs: 10, fat: 0.4 },
+  bakla: { kcal: 88, protein: 8, carbs: 12, fat: 0.7 },
+  pancar: { kcal: 43, protein: 1.6, carbs: 10, fat: 0.2 },
+  turp: { kcal: 16, protein: 0.7, carbs: 3.4, fat: 0.1 },
+  'yer-elmasi': { kcal: 73, protein: 2, carbs: 17, fat: 0 },
+  roka: { kcal: 25, protein: 2.6, carbs: 3.7, fat: 0.7 },
+  tere: { kcal: 32, protein: 2.6, carbs: 5.5, fat: 0.7 },
+  kapari: { kcal: 23, protein: 2.4, carbs: 5, fat: 0.9 },
+  'asma-yapragi': { kcal: 93, protein: 5.6, carbs: 17, fat: 2.1 },
+  'nar-eksisi': { kcal: 268, protein: 0.4, carbs: 66, fat: 0.3 },
+  'dut-pekmezi': { kcal: 290, protein: 1.2, carbs: 71, fat: 0.3 },
+  'keciboynuzu-pekmezi': { kcal: 290, protein: 1.2, carbs: 71, fat: 0.3 },
+  'koruk-suyu': { kcal: 20, protein: 0.2, carbs: 4.5, fat: 0 },
+  bildircin: { kcal: 192, protein: 20, carbs: 0, fat: 12 },
+  lakerda: { kcal: 200, protein: 25, carbs: 0, fat: 11 },
+  'kars-gravyeri': { kcal: 413, protein: 30, carbs: 1.5, fat: 32 },
+  kuzugobegi: { kcal: 31, protein: 3.1, carbs: 5, fat: 0.6 },
+  firik: { kcal: 350, protein: 12, carbs: 72, fat: 2.5 },
+  'misir-unu': { kcal: 370, protein: 7, carbs: 79, fat: 1.8 },
+  'arpa-sehriye': { kcal: 358, protein: 12, carbs: 71, fat: 1.5 },
+  borulce: { kcal: 336, protein: 24, carbs: 60, fat: 1.3 },
+  vanilya: { kcal: 288, protein: 0.1, carbs: 12.7, fat: 0.1 },
+  // Korpusta en çok gramaj taşıyan değersiz malzeme buydu: 42 kg.
+  'kuru-soganli-tursu': { kcal: 11, protein: 0.5, carbs: 2.3, fat: 0.2 },
+  'uzum-sirkesi': { kcal: 19, protein: 0, carbs: 0.9, fat: 0 },
+  'soya-sosu': { kcal: 53, protein: 8, carbs: 4.9, fat: 0.6 },
+  hashas: { kcal: 525, protein: 18, carbs: 28, fat: 42 },
+  tofu: { kcal: 76, protein: 8, carbs: 1.9, fat: 4.8 },
+  corekotu: { kcal: 345, protein: 16, carbs: 52, fat: 15 },
+
   // Sıfır / ihmal edilebilir
   su: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
   tuz: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
@@ -186,6 +241,30 @@ export const INGREDIENT_MACROS: Record<string, Macros> = {
   maya: { kcal: 325, protein: 40, carbs: 38, fat: 8 },
 };
 
+/**
+ * Üç katmanlı arama.
+ *
+ *  1. `INGREDIENT_MACROS` — bu dosyadaki elle yazılmış, kürate edilmiş
+ *     değerler. En yetkili katman; içe aktarım bunları ezmiyor.
+ *  2. `ITHAL_MACROS` — yemek.com malzeme tablosundan üretilen ikinci katman
+ *     (`besin-ithal.ts`). Kimlik eşleşmesi, Atwater ve aralık denetiminden
+ *     geçmiş 56 malzeme.
+ *  3. `CATEGORY_MACROS` — kategori ortalaması. Son çare: kestaneyi
+ *     "kuruyemiş" sayıp 600 kcal veriyor, gerçekte 200. Bu katmana düşen
+ *     malzeme sayısı ne kadar azalırsa hesap o kadar doğru.
+ */
 export function macrosFor(slug: string, category: IngredientCategory): Macros {
-  return INGREDIENT_MACROS[slug] ?? CATEGORY_MACROS[category] ?? CATEGORY_MACROS.diger;
+  return (
+    INGREDIENT_MACROS[slug] ??
+    ITHAL_MACROS[slug] ??
+    CATEGORY_MACROS[category] ??
+    CATEGORY_MACROS.diger
+  );
+}
+
+/** Değer gerçek ölçümden mi geliyor, kategori ortalamasından mı? */
+export function macrosQuality(slug: string): 'kurate' | 'ithal' | 'ortalama' {
+  if (slug in INGREDIENT_MACROS) return 'kurate';
+  if (slug in ITHAL_MACROS) return 'ithal';
+  return 'ortalama';
 }

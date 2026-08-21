@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { FlaskConical, Refrigerator, Search, UserRound } from 'lucide-react-native';
+import { FlaskConical, Refrigerator, Search, ShoppingBasket, UserRound } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -21,6 +21,7 @@ import {
 import { applyProfile } from '@/lib/profile-filter';
 import { recipesForTerm } from '@/lib/recipe-filter';
 import { useFavorites } from '@/lib/store/favorites';
+import { useGrocery } from '@/lib/store/grocery';
 import { favouriteMain, useHistory } from '@/lib/store/history';
 import { useProfile, useProfileFilter } from '@/lib/store/profile';
 import { topTerms, useSearchLog } from '@/lib/store/search-log';
@@ -38,6 +39,7 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const email = useProfile((s) => s.email);
+  const basketCount = useGrocery((s) => s.items.length);
   const profileFilter = useProfileFilter();
 
   const logs = useHistory((s) => s.logs);
@@ -119,6 +121,23 @@ export default function HomeScreen() {
             style={{ flex: 1, fontSize: 34, lineHeight: 34, fontFamily: 'ZalandoSans_SemiExpanded_Bold', letterSpacing: -0.5 }}>
             İlham mı arıyorsun?
           </Text>
+          {/**
+            * Sepet simgesi yalnızca içinde bir şey varken görünüyor. Boş
+            * sepete giden bir düğme ana sayfada yer kaplamaktan başka bir şey
+            * yapmıyor; dolu sepet ise unutulmaması gereken bir iş.
+            */}
+          {basketCount ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Sepetim, ${basketCount} malzeme`}
+              onPress={() => router.push('/sepet')}
+              style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}>
+              <ShoppingBasket size={20} color={palette.brand} />
+              <View style={styles.basketBadge}>
+                <RNText style={styles.basketBadgeText}>{String(basketCount)}</RNText>
+              </View>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={email ? 'Hesabın' : 'Giriş yap'}
@@ -176,7 +195,7 @@ export default function HomeScreen() {
                   {c.labelTr}
                 </Text>
                 <Image 
-                  source={{ uri: `https://loremflickr.com/200/200/food,dish?random=${c.id}` }} 
+                  source={{ uri: `https://picsum.photos/seed/${c.id}/200/200` }} 
                   style={{ position: 'absolute', bottom: -20, width: 80, height: 80, borderRadius: 40 }} 
                 />
               </Pressable>
@@ -292,7 +311,7 @@ export default function HomeScreen() {
           <Pressable onPress={() => router.push('/menu')} style={{ backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 20, borderRadius: 8, alignSelf: 'flex-start' }}>
             <Text variant="button" style={{ color: palette.brand, fontWeight: '700', fontSize: 15 }}>Hemen Başla</Text>
           </Pressable>
-          <Image source={{ uri: 'https://loremflickr.com/200/400/phone,app?random=cookbook' }} style={{ position: 'absolute', right: -30, top: 20, width: 140, height: 280, resizeMode: 'contain', transform: [{ rotate: '5deg' }] }} />
+          <Image source={{ uri: 'https://picsum.photos/seed/cookbook/200/400' }} style={{ position: 'absolute', right: -30, top: 20, width: 140, height: 280, resizeMode: 'contain', transform: [{ rotate: '5deg' }] }} />
         </View>
 
         {DISH_CATEGORIES.slice(1, 3).map((c) => {
@@ -381,6 +400,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
   },
+  basketBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    backgroundColor: palette.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  basketBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800', lineHeight: 16 },
 
   catStrip: { paddingHorizontal: spacing.xl, gap: spacing.sm },
   cat: { width: 80, gap: spacing.sm, alignItems: 'center' },

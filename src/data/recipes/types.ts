@@ -114,6 +114,19 @@ export interface Recipe {
   difficulty: 1 | 2 | 3;
   components: RecipeComponent[];
   tags: string[];
+  /**
+   * Tarifin kendi fotoğrafı. Yalnızca kaynağında fotoğraf olan korpusta dolu;
+   * boşken arayüz kategori rengine ve yer tutucuya düşüyor.
+   */
+  imageUrl?: string;
+  /**
+   * Kaynağından gelen, porsiyon başına besin değeri.
+   *
+   * Doluysa yetkilidir ve hesaplanmaz: kaynak tarifi gerçekten ölçmüşse
+   * bizim tahminimiz onun yerine geçmemeli. Boşsa `nutritionOf` malzemelerden
+   * ve pişirme yönteminden hesaplıyor.
+   */
+  nutrition?: { kcal: number; protein: number; carbs: number; fat: number };
   /** Tüm bileşenlerdeki malzeme slug'ları — filtreleme için düzleştirilmiş. */
   allSlugs: string[];
 }
@@ -150,6 +163,10 @@ export interface RawRecipe {
   d?: 1 | 2 | 3;
   sum: string;
   tags?: string[];
+  /** Tarif fotoğrafının adresi — kaynağında varsa. */
+  img?: string;
+  /** Kaynağından gelen porsiyon başına besin değeri: [kcal, protein, karbonhidrat, yağ]. */
+  nut?: [number, number, number, number];
 
   // Tek bileşenli kısayol
   me?: CookMethod;
@@ -201,6 +218,10 @@ export function buildRecipe(r: RawRecipe): Recipe {
     difficulty: r.d ?? 1,
     components,
     tags: r.tags ?? [],
+    imageUrl: r.img,
+    nutrition: r.nut
+      ? { kcal: r.nut[0], protein: r.nut[1], carbs: r.nut[2], fat: r.nut[3] }
+      : undefined,
     allSlugs,
   };
 }

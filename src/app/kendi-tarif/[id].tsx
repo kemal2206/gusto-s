@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, ChefHat, Clock, Trash2, Users } from 'lucide-react-native';
+import { Check, ChefHat, Clock, Plus, ShoppingBasket, Trash2, Users } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,7 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { BY_SLUG } from '@/data/catalog';
 import { CATEGORY_BY_ID } from '@/data/recipes';
+import { consolidate, textKey, type BasketLine } from '@/lib/sepet';
 import { useCookbook } from '@/lib/store/cookbook';
+import type { OwnIngredient } from '@/lib/cookbook/types';
+import { useGrocery } from '@/lib/store/grocery';
 import { palette, radius, spacing, tabularNums } from '@/theme/tokens';
 
 /**
@@ -31,6 +35,12 @@ export default function OwnRecipeScreen() {
   const markCooked = useCookbook((s) => s.markCooked);
   const remove = useCookbook((s) => s.remove);
 
+  const basket = useGrocery((s) => s.items);
+  const addGrocery = useGrocery((s) => s.addMany);
+  const toggleGrocery = useGrocery((s) => s.toggleOne);
+  const removeFromBasket = useGrocery((s) => s.removeRecipe);
+  const [basketCleared, setBasketCleared] = useState(false);
+
   if (!item || item.kind !== 'kendi') {
     return (
       <View style={[styles.root, { paddingTop: insets.top + 40, paddingHorizontal: spacing.xl }]}>
@@ -45,6 +55,36 @@ export default function OwnRecipeScreen() {
   }
 
   const category = item.categoryId ? CATEGORY_BY_ID.get(item.categoryId) : undefined;
+
+  /**
+   * Kendi tarifinin satırları sepete böyle çevriliyor.
+   *
+   * Katalogla eşleşen satır slug'ıyla gidiyor — böylece uygulamanın
+   * tarifinden gelen soğanla sepette aynı satırda birleşiyor. Eşleşmeyen
+   * satır **yazıldığı hâliyle** gidiyor: "annemin turşusundan bir kavanoz"
+   * katalogda yok ama alışverişte lazım; sessizce atmak kullanıcının kendi
+   * listesini budamak olurdu. Miktarı çözülememişse gram 0 kalıyor ve
+   * sepette miktar satırı hiç yazılmıyor.
+   */
+  const lineFor = (ing: OwnIngredient): BasketLine =>
+    ing.slug
+      ? { slug: ing.slug, grams: ing.grams ?? 0 }
+      : { slug: textKey(ing.raw), grams: 0, label: ing.raw };
+
+  const lines = consolidate(item.ingredients.map(lineFor));
+  const totalOf = new Map(lines.map((l) => [l.slug, l]));
+  const inBasket = new Set(
+    basket.filter((b) => b.sources.some((s) => s.recipe === item.title)).map((b) => b.slug),
+  );
+  const missing = lines.filter((l) => !inBasket.has(l.slug));
+
+  const onAddAll = () => {
+    if (missing.length === 0) {
+      router.push('/sepet');
+      return;
+    }
+    addGrocery(item.title, missing);
+  };
 
   return (
     <View style={styles.root}>
@@ -84,10 +124,26 @@ export default function OwnRecipeScreen() {
         <Text variant="h3" tone="brandDeep" style={styles.malzemelerTitle}>
           Malzemeler
         </Text>
+        <Text variant="caption" tone="muted" style={{ marginTop: spacing.sm }}>
+          Malzemeye dokun, sepete girsin.
+        </Text>
+
         {item.ingredients.map((ing, i) => {
           const known = ing.slug ? BY_SLUG.get(ing.slug) : undefined;
+          const line = totalOf.get(ing.slug ?? textKey(ing.raw)) ?? lineFor(ing);
+          const added = inBasket.has(line.slug);
           return (
-            <View key={`${ing.raw}-${i}`} style={styles.row}>
+            <Pressable
+              key={`${ing.raw}-${i}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: added }}
+              accessibilityLabel={
+                added
+                  ? `${ing.raw} sepette. Çıkarmak için dokun.`
+                  : `${ing.raw}. Sepete eklemek için dokun.`
+              }
+              onPress={() => toggleGrocery(item.title, line)}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}>
               {known ? (
                 <IngredientAvatar ingredient={known} size={36} />
               ) : (
@@ -96,9 +152,34 @@ export default function OwnRecipeScreen() {
               <Text variant="body" style={{ flex: 1 }}>
                 {ing.raw}
               </Text>
-            </View>
+              <View style={[styles.rowBasket, added && styles.rowBasketOn]}>
+                {added ? (
+                  <Check size={16} color={palette.surface} />
+                ) : (
+                  <Plus size={16} color={palette.inkMuted} />
+                )}
+              </View>
+            </Pressable>
           );
         })}
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAddAll}
+          style={({ pressed }) => [styles.toBasket, pressed && { opacity: 0.85 }]}>
+          {missing.length === 0 ? (
+            <Check size={18} color={palette.brandDeep} />
+          ) : (
+            <ShoppingBasket size={18} color={palette.brandDeep} />
+          )}
+          <Text variant="button" tone="brandDeep">
+            {missing.length === 0
+              ? 'Hepsi sepette — sepeti aç'
+              : missing.length === lines.length
+                ? 'Tümünü sepete ekle'
+                : `Kalan ${missing.length} malzemeyi ekle`}
+          </Text>
+        </Pressable>
 
         <Text variant="h3" tone="brandDeep" style={{ marginTop: spacing['3xl'] }}>
           Yapılışı
@@ -120,8 +201,18 @@ export default function OwnRecipeScreen() {
           <Button
             label={item.cookedAt ? 'Bir kez daha pişirdim' : 'Bunu pişirdim'}
             variant="secondary"
-            onPress={() => markCooked(item.id)}
+            onPress={() => {
+              markCooked(item.id);
+              // Pişirdiysen almışsındır: yalnızca bu tarifin sepetteki payı düşüyor.
+              setBasketCleared(inBasket.size > 0);
+              removeFromBasket(item.title);
+            }}
           />
+          {basketCleared ? (
+            <Text variant="caption" tone="muted" center>
+              Bu tarifin malzemeleri sepetten düşüldü.
+            </Text>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Tarifi kitaptan sil"
@@ -176,6 +267,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: palette.borderStrong,
+  },
+  /** Satırın sağ ucundaki ekle/çıkar işareti. */
+  rowBasket: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowBasketOn: { backgroundColor: palette.brand, borderColor: palette.brand },
+  toBasket: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 56,
+    marginTop: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: palette.brand,
+    backgroundColor: palette.surface,
   },
   step: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md, alignItems: 'flex-start' },
   stepDot: {
