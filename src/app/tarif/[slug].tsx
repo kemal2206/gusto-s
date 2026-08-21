@@ -87,7 +87,7 @@ export default function RecipeScreen() {
     return (
       <View style={styles.missing}>
         <Text variant="bodyStrong">Tarif bulunamadı.</Text>
-        <Button label="Geri" onPress={() => router.back()} style={{ marginTop: 20 }} />
+        <Button label="Geri" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ marginTop: 20 }} />
       </View>
     );
   }
@@ -98,7 +98,7 @@ export default function RecipeScreen() {
    * kendisi değil.
    */
   const imageUrl =
-    recipe.imageUrl ?? `https://picsum.photos/seed/${recipe.slug}/800/600`;
+    recipe.imageUrl ?? `https://loremflickr.com/800/600/food,recipe?random=${recipe.slug}`;
   const category = CATEGORY_BY_ID.get(recipe.categoryId);
   const nutrition = nutritionOf(recipe);
   const allergens = allergensOf(recipe);
@@ -274,7 +274,7 @@ export default function RecipeScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Geri"
-              onPress={() => router.back()}
+              onPress={() => router.canGoBack() ? router.back() : router.replace('/')}
               style={styles.iconButton}>
               <ArrowLeft color="#fff" size={20} />
             </Pressable>
@@ -336,20 +336,12 @@ export default function RecipeScreen() {
                 {saved ? 'Kaydedildi' : 'Kaydet'}
               </Text>
             </Pressable>
-            {/**
-              * Bu simge artık ekleme yapmıyor, sepeti açıyor. Ekleme işi iki
-              * yerde: malzeme satırının kendisinde ve alttaki geniş düğmede.
-              * Üç ayrı ekleme yolu olması kullanıcıya bir şey kazandırmıyordu;
-              * eklediğini görebileceği bir kapı kazandırıyor.
-              */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={
-                basket.length ? `Sepetim, ${basket.length} malzeme var` : 'Sepetim, boş'
-              }
-              onPress={() => router.push('/sepet')}
-              style={styles.outlineIcon}>
-              <ShoppingBasket size={18} color={INK} />
+              accessibilityLabel="Tümünü sepete ekle"
+              onPress={onAddGrocery}
+              style={[styles.outlineIcon, missing.length === 0 && { borderColor: '#e6103b' }]}>
+              <ShoppingBasket size={18} color={missing.length === 0 ? '#e6103b' : INK} />
               {basket.length ? (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{String(basket.length)}</Text>
@@ -410,9 +402,9 @@ export default function RecipeScreen() {
                   {people} kişilik
                 </Text>
                 {peopleOpen ? (
-                  <ChevronUp size={18} color={INK} />
+                  <ChevronUp size={16} color={INK} />
                 ) : (
-                  <ChevronDown size={18} color={INK} />
+                  <ChevronDown size={16} color={INK} />
                 )}
               </Pressable>
             </View>
@@ -856,11 +848,11 @@ const styles = StyleSheet.create({
   ingName: { fontSize: 16, color: INK, fontWeight: '800' },
   ingAmount: { color: '#555', fontSize: 15, marginTop: 2 },
   ingBasketNote: { color: '#9a7b57', marginTop: 3 },
-  /** Satırın sağ ucundaki ekle/çıkar işareti. 44×44 — parmak ölçüsü. */
+  /** Satırın sağ ucundaki ekle/çıkar işareti. */
   ingBasket: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: LINE,
     backgroundColor: '#fff',
@@ -916,13 +908,13 @@ const styles = StyleSheet.create({
   peopleChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    minHeight: 52,
-    paddingHorizontal: 16,
-    borderRadius: 26,
+    gap: 4,
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 18,
     backgroundColor: TAG_BG,
   },
-  peopleChipText: { color: INK, fontSize: 16 },
+  peopleChipText: { color: INK, fontSize: 14 },
 
   peopleEditor: {
     marginBottom: 20,

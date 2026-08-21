@@ -26,7 +26,7 @@ export function RecipeTile({ recipe, inverse, fluid, matchHint }: { recipe: Reci
   const category = CATEGORY_BY_ID.get(recipe.categoryId);
   
   const imageUrl =
-    recipe.imageUrl ?? `https://picsum.photos/seed/${recipe.slug}/400/400`;
+    recipe.imageUrl ?? `https://loremflickr.com/400/400/food,recipe?random=${recipe.slug}`;
 
   return (
     <View style={[styles.tile, fluid && { width: '100%' }]}>

@@ -468,7 +468,7 @@ export default function CravingScreen() {
                   ]}>
                   <Text variant="bodyStrong" style={{ fontSize: 15, width: '60%', zIndex: 2, color: '#111' }}>{o.label}</Text>
                   <Image 
-                    source={{ uri: `https://picsum.photos/seed/${o.slug}/200/200` }} 
+                    source={{ uri: `https://loremflickr.com/200/200/food,recipe?random=${o.slug}` }}
                     style={{ position: 'absolute', right: -25, width: 84, height: 84, borderRadius: 42 }} 
                   />
                 </Pressable>
@@ -578,7 +578,7 @@ export default function CravingScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`${cat} tarifleri`}
                   style={{ width: HALF_WIDTH, height: HALF_WIDTH, borderRadius: 12, overflow: 'hidden' }}>
-                  <Image source={{ uri: `https://picsum.photos/seed/${cat}/400/400` }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+                  <Image source={{ uri: `https://loremflickr.com/400/400/food,recipe?random=${cat}` }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
                   <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end', padding: 12 }}>
                     <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>{cat}</Text>
                   </View>
@@ -630,7 +630,7 @@ export default function CravingScreen() {
                * "20 dakika" ya da "az malzemeli" için yemek fotoğrafı koymak
                * hem bilgi taşımıyor hem yanıltıyor.
                */
-              imageUrl={o.slug ? `https://picsum.photos/seed/${o.slug}/300/300` : undefined}
+              imageUrl={o.slug ? `https://loremflickr.com/300/300/food,recipe?random=${o.slug}` : undefined}
               selected={selected === o.value}
               onPress={() => answer(step!.id, o.value)}
             />

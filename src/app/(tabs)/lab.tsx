@@ -384,7 +384,7 @@ export default function LabScreen() {
               description={g.hintTr}
               icon={
                 <Image
-                  source={{ uri: `https://picsum.photos/seed/${g.id}/100/100` }}
+                  source={{ uri: `https://loremflickr.com/100/100/ingredient,food?random=${g.id}` }}
                   style={{ width: 48, height: 48, borderRadius: 24 }}
                 />
               }

@@ -121,23 +121,18 @@ export default function HomeScreen() {
             style={{ flex: 1, fontSize: 34, lineHeight: 34, fontFamily: 'ZalandoSans_SemiExpanded_Bold', letterSpacing: -0.5 }}>
             İlham mı arıyorsun?
           </Text>
-          {/**
-            * Sepet simgesi yalnızca içinde bir şey varken görünüyor. Boş
-            * sepete giden bir düğme ana sayfada yer kaplamaktan başka bir şey
-            * yapmıyor; dolu sepet ise unutulmaması gereken bir iş.
-            */}
-          {basketCount ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Sepetim, ${basketCount} malzeme`}
-              onPress={() => router.push('/sepet')}
-              style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}>
-              <ShoppingBasket size={20} color={palette.brand} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Sepetim, ${basketCount} malzeme`}
+            onPress={() => router.push('/sepet')}
+            style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}>
+            <ShoppingBasket size={20} color={basketCount ? palette.brand : palette.inkMuted} />
+            {basketCount > 0 && (
               <View style={styles.basketBadge}>
                 <RNText style={styles.basketBadgeText}>{String(basketCount)}</RNText>
               </View>
-            </Pressable>
-          ) : null}
+            )}
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={email ? 'Hesabın' : 'Giriş yap'}
@@ -195,7 +190,7 @@ export default function HomeScreen() {
                   {c.labelTr}
                 </Text>
                 <Image 
-                  source={{ uri: `https://picsum.photos/seed/${c.id}/200/200` }} 
+                  source={{ uri: `https://loremflickr.com/200/200/food,recipe?random=${c.id}` }} 
                   style={{ position: 'absolute', bottom: -20, width: 80, height: 80, borderRadius: 40 }} 
                 />
               </Pressable>
@@ -311,7 +306,7 @@ export default function HomeScreen() {
           <Pressable onPress={() => router.push('/menu')} style={{ backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 20, borderRadius: 8, alignSelf: 'flex-start' }}>
             <Text variant="button" style={{ color: palette.brand, fontWeight: '700', fontSize: 15 }}>Hemen Başla</Text>
           </Pressable>
-          <Image source={{ uri: 'https://picsum.photos/seed/cookbook/200/400' }} style={{ position: 'absolute', right: -30, top: 20, width: 140, height: 280, resizeMode: 'contain', transform: [{ rotate: '5deg' }] }} />
+          <Image source={{ uri: 'https://loremflickr.com/200/400/food,cookbook?random=cookbook' }} style={{ position: 'absolute', right: -30, top: 20, width: 140, height: 280, resizeMode: 'contain', transform: [{ rotate: '5deg' }] }} />
         </View>
 
         {DISH_CATEGORIES.slice(1, 3).map((c) => {

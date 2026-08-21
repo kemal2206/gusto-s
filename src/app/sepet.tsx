@@ -133,11 +133,9 @@ export default function BasketScreen() {
     });
   };
 
-  const onClear = () =>
-    Alert.alert('Sepeti boşalt', 'Listedeki her şey silinecek. Emin misin?', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Boşalt', style: 'destructive', onPress: clear },
-    ]);
+  const onClear = () => {
+    clear();
+  };
 
   return (
     <View style={styles.root}>
@@ -146,7 +144,7 @@ export default function BasketScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Geri"
-          onPress={() => router.back()}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}
           style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.6 }]}>
           <ArrowLeft size={22} color={INK} />
         </Pressable>
