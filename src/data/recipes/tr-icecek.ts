@@ -2,8 +2,10 @@
  * Türk ve komşu mutfağı içecekleri — elle yazıldı.
  *
  * İçe aktarılan korpusun "içecek" kategorisi neredeyse tamamen zayıflama
- * kürü ve şurup içeriğiydi; hepsini eledik. Sofrada gerçekten içilen şeyleri
- * buraya kendimiz yazdık: menü kurucunun beşinci tabağı buradan geliyor.
+ * kürü ve şurup içeriğiydi; kapıyı kapattık. İçe aktarıcı yalnızca elle
+ * onayladığımız iki içeceği geçiriyor (`05-tarif-ithal.ts`, DRINK_ALLOWLIST).
+ * Sofrada gerçekten içilen şeyleri buraya kendimiz yazdık: menü kurucunun
+ * beşinci tabağı ağırlıkla buradan geliyor.
  */
 
 import type { RawRecipe } from './types';

@@ -18,6 +18,7 @@ import {
   recipesByCategory,
   recipesWithIngredient,
 } from '@/data/recipes';
+import { YEREL_GORSEL } from '@/data/recipes/gorsel-yerel';
 import { applyProfile } from '@/lib/profile-filter';
 import { recipesForTerm } from '@/lib/recipe-filter';
 import { useFavorites } from '@/lib/store/favorites';
@@ -74,22 +75,38 @@ export default function HomeScreen() {
   );
 
   /**
-   * "En popüler" — beğeni verimiz yok. Onun yerine makul sürede pişen,
-   * adımı yazılmış tarifleri gösteriyoruz; sıra her açılışta sabit kalsın
-   * diye rastgele değil, adım sayısına göre.
+   * "En popüler" — beğeni verimiz yok.
+   *
+   * Önce **kendi ürettiğimiz görseli olan** tarifler geliyor: ray uygulamanın
+   * ilk ekranı ve orada rastgele bir internet fotoğrafı yerine tarifin
+   * gerçek karesinin durması en çok fark edilen yer.
+   *
+   * Arkasını eski ölçüt dolduruyor — makul sürede pişen, adımı yazılmış
+   * tarifler. Sıra her açılışta sabit kalsın diye rastgele değil.
    */
-  const quick = useMemo(
-    () =>
-      applyProfile(
-        RECIPES.filter((r) => r.totalMinutes >= 15 && r.totalMinutes <= 45).sort(
-          (a, b) =>
-            b.components[0].steps.length - a.components[0].steps.length ||
-            a.totalMinutes - b.totalMinutes,
-        ),
-        profileFilter,
-      ).slice(0, 12),
-    [profileFilter],
-  );
+  const quick = useMemo(() => {
+    const gorselli = applyProfile(
+      Object.keys(YEREL_GORSEL)
+        .map((s) => RECIPE_BY_SLUG.get(s))
+        .filter((r) => r !== undefined),
+      profileFilter,
+    );
+
+    const gorselliSluglar = new Set(gorselli.map((r) => r.slug));
+    const kalan = applyProfile(
+      RECIPES.filter(
+        (r) =>
+          !gorselliSluglar.has(r.slug) && r.totalMinutes >= 15 && r.totalMinutes <= 45,
+      ).sort(
+        (a, b) =>
+          b.components[0].steps.length - a.components[0].steps.length ||
+          a.totalMinutes - b.totalMinutes,
+      ),
+      profileFilter,
+    );
+
+    return [...gorselli, ...kalan].slice(0, 16);
+  }, [profileFilter]);
 
   /** Listenin sonundan gelen tarifler — "topluluktan" rayı. */
   const community = useMemo(

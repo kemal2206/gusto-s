@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { CATEGORY_BY_ID, type Recipe } from '@/data/recipes';
+import { gorselKaynagi } from '@/data/recipes/gorsel-yerel';
 import { useFavorites } from '@/lib/store/favorites';
 import { palette, radius, spacing, tabularNums, tintFor } from '@/theme/tokens';
 
@@ -25,8 +26,7 @@ export function RecipeTile({ recipe, inverse, fluid, matchHint }: { recipe: Reci
 
   const category = CATEGORY_BY_ID.get(recipe.categoryId);
   
-  const imageUrl =
-    recipe.imageUrl ?? `https://loremflickr.com/400/400/food,recipe?random=${recipe.slug}`;
+  const imageSource = gorselKaynagi(recipe.slug, recipe.imageUrl, '400/400');
 
   return (
     <View style={[styles.tile, fluid && { width: '100%' }]}>
@@ -37,7 +37,7 @@ export function RecipeTile({ recipe, inverse, fluid, matchHint }: { recipe: Reci
         style={({ pressed }) => [styles.pressableContainer, pressed && styles.pressed]}>
         <View style={[styles.art, { backgroundColor: tintFor(recipe.categoryId), overflow: 'hidden' }, fluid && { width: '100%' }]}>
           <Image 
-            source={{ uri: imageUrl }} 
+            source={imageSource}
             style={{ width: '100%', height: '100%', position: 'absolute' }} 
           />
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.05)' }} />

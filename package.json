@@ -74,6 +74,8 @@
     "data:besin": "tsx scripts/pipeline/07-besin-ithal.ts",
     "data:npmi": "tsx scripts/pipeline/08-npmi.ts",
     "data:uyum": "tsx scripts/pipeline/10-uyum.ts",
+    "data:gorsel": "tsx scripts/pipeline/11-gorsel-prompt.ts",
+    "gorsel:uret": "tsx scripts/pipeline/12-gorsel-uret.ts",
     "data:datahive": "tsx scripts/pipeline/09-datahive-fetch.ts",
     "kalibrasyon:besin": "tsx scripts/kalibrasyon-besin.ts",
     "kalibrasyon:tr": "tsx scripts/kalibrasyon-tr.ts",

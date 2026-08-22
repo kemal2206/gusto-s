@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 
 import { INGREDIENTS } from '../../src/data/catalog/index.ts';
-import { refineCategory } from '../../src/data/recipes/ad-kurallari.ts';
+import { isSogukYemek, refineCategory } from '../../src/data/recipes/ad-kurallari.ts';
 import { sanePortions } from '../../src/data/recipes/kategoriler.ts';
 
 import {
@@ -29,7 +29,7 @@ import {
   BY_SLUG,
   esc,
   grams,
-  JUNK_TITLE,
+  isHealthClaim,
   norm,
   NOT_FOOD,
   PROTEIN_GUARD,
@@ -45,6 +45,15 @@ const CATEGORY: Record<string, string> = {
   kahvaltı: 'kahvalti', tatlı: 'tatli', atıştırmalık: 'meze-salata',
   içecek: 'icecek', turşu: 'meze-salata',
 };
+
+/**
+ * Korpustan içecek diye alınmasına izin verilen tarifler. Gerekçe ve kapının
+ * kendisi aşağıda, `cat === 'icecek'` denetiminde.
+ */
+const DRINK_ALLOWLIST = new Set([
+  'diyarbakir-usulu-ayran', // yoğurt, su, salatalık, nane — bölgesel ayran
+  'altin-sut', // süt, zerdeçal, tarçın, bal — adında da adımlarında da iddia yok
+]);
 
 const METHOD: Record<string, string> = {
   fırın: 'firin', tencere: 'sulu', tava: 'tava', haşlama: 'haslama',
@@ -81,10 +90,11 @@ let skippedEmpty = 0;
 let skippedJunk = 0;
 let skippedLie = 0;
 let skippedAbsurd = 0;
+let skippedDrink = 0;
 let injected = 0;
 
 for (const r of src) {
-  if (JUNK_TITLE.test(r.tarif_adi ?? '')) {
+  if (isHealthClaim(r.tarif_adi ?? '')) {
     skippedJunk += 1;
     continue;
   }
@@ -175,8 +185,43 @@ for (const r of src) {
    */
   const rawMins = (r.hazirlik_suresi_dk ?? 0) + (r.pisirme_suresi_dk ?? 0);
   const mins = rawMins >= 5 && rawMins <= 480 ? Math.round(rawMins) : Math.min(120, 10 + steps.length * 6);
-  const method = METHOD[norm((r.pisirme_yontemi ?? [])[0] ?? '')] ?? 'tava';
   const cat = refineCategory(r.tarif_adi, CATEGORY[norm(r.kategori ?? '')] ?? 'etli-sulu');
+
+  /**
+   * Yöntem — varsayılan artık körü körüne `tava` değil.
+   *
+   * Kaynağın `pisirme_yontemi` alanı sık sık boş ya da tanınmayan bir değer
+   * taşıyor; eski hâl hepsini `tava`'ya düşürüyordu ve cacık, piyaz, turşu
+   * "tavada pişmiş" oluyordu. Sessiz bir hataydı çünkü hiçbir ekran pişirme
+   * yöntemini tek başına göstermiyor — görsel üretimi kabı ve açıyı bu
+   * alandan seçince ortaya çıktı (134 tarif).
+   */
+  const method =
+    METHOD[norm((r.pisirme_yontemi ?? [])[0] ?? '')] ??
+    (cat === 'icecek' ? 'karistir' : isSogukYemek(r.tarif_adi) ? 'cig' : 'tava');
+
+  /**
+   * İçecek kapısı — beyaz liste.
+   *
+   * Kaynağın "içecek" kategorisi 36 kayıt ve 24'ü açıktan zayıflama küründen
+   * ibaret; kalanın yarısı da yanlış etiketlenmiş poğaça. Sofrada gerçekten
+   * içilen şeyleri `src/data/recipes/tr-icecek.ts`'e elle yazdık, menü
+   * kurucunun beşinci tabağı oradan geliyor.
+   *
+   * Ad süzgeci bu kategoriye tek başına yetmiyor, çünkü kalan tarifler
+   * iddiayı adında taşımıyor: "Kereviz Sapı Suyu" tülbentten süzülen bir
+   * detoks suyu, "Yemeklik Sebze Suyu" ise 3 litrelik sebze suyu — buzlukta
+   * saklanan bir tabanı `ad-kurallari.ts` "…suyu" diye içeceğe taşıyor.
+   * İkisi de akşam yemeğinin yanına içecek diye konulamaz.
+   *
+   * Bu yüzden kapı kapalı çalışıyor: içeceğe düşen tarif elle onaylanmadıkça
+   * alınmıyor. Korpus yenilendiğinde yeni bir kür sessizce içeri giremez.
+   */
+  if (cat === 'icecek' && !DRINK_ALLOWLIST.has(slug)) {
+    skippedDrink += 1;
+    continue;
+  }
+
   const diff = r.zorluk === 'zor' ? 3 : r.zorluk === 'orta' ? 2 : 1;
 
   /**
@@ -207,6 +252,7 @@ console.log(`  atlandı (boş/eksik):${skippedEmpty}`);
 console.log(`  atlandı (sağlık iddiası): ${skippedJunk}`);
 console.log(`  atlandı (adı malzemesini tutmuyor): ${skippedLie}`);
 console.log(`  atlandı (imkânsız miktar): ${skippedAbsurd}`);
+console.log(`  atlandı (onaysız içecek): ${skippedDrink}`);
 console.log(`  ana malzemesi eklendi: ${injected}`);
 console.log(`  kullanılan malzeme: ${usedIngredients.size} / ${INGREDIENTS.length}`);
 

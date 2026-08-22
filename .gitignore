@@ -31,7 +31,12 @@ yarn-error.*
 *.pem
 
 # local env files
+# Düz `.env` de listede: yalnızca `.env*.local` yok sayılıyordu ve görsel
+# üretimi API anahtarı gerektiriyor (FAL_KEY / REPLICATE_API_TOKEN).
+# `.env.example` izleniyor, içinde gerçek değer yok.
+.env
 .env*.local
+!.env.example
 
 # typescript
 *.tsbuildinfo

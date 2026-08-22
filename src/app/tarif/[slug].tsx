@@ -30,6 +30,7 @@ import {
   METHOD_LABELS_TR,
   RECIPE_BY_SLUG,
 } from '@/data/recipes';
+import { gorselKaynagi } from '@/data/recipes/gorsel-yerel';
 import { eaterCount } from '@/lib/profile-model';
 import { scaleFactorFor, scaleGrams } from '@/lib/profile-filter';
 import { allergensOf, nutritionOf, tagsOf, utensilsOf } from '@/lib/recipe-facts';
@@ -97,8 +98,7 @@ export default function RecipeScreen() {
    * yer tutucu duruyor: konusu yemek olan rastgele bir fotoğraf, tarifin
    * kendisi değil.
    */
-  const imageUrl =
-    recipe.imageUrl ?? `https://loremflickr.com/800/600/food,recipe?random=${recipe.slug}`;
+  const imageSource = gorselKaynagi(recipe.slug, recipe.imageUrl, '800/600');
   const category = CATEGORY_BY_ID.get(recipe.categoryId);
   const nutrition = nutritionOf(recipe);
   const allergens = allergensOf(recipe);
@@ -269,7 +269,7 @@ export default function RecipeScreen() {
         
         {/* ── Kapak ─────────────────────────────────────────────── */}
         <View style={styles.hero}>
-          <Image source={{ uri: imageUrl }} style={styles.heroImage} />
+          <Image source={imageSource} style={styles.heroImage} />
           <View style={[styles.heroActions, { top: Math.max(insets.top, 20) }]}>
             <Pressable
               accessibilityRole="button"

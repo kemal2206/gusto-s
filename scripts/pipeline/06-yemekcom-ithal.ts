@@ -33,7 +33,7 @@ import fs from 'node:fs';
 
 import { INGREDIENTS } from '../../src/data/catalog/index.ts';
 import { UNIT_NAMES } from '../../src/data/catalog/olcu.ts';
-import { refineCategory } from '../../src/data/recipes/ad-kurallari.ts';
+import { isSogukYemek, refineCategory } from '../../src/data/recipes/ad-kurallari.ts';
 import { sanePortions } from '../../src/data/recipes/kategoriler.ts';
 
 import {
@@ -41,7 +41,7 @@ import {
   BY_SLUG,
   esc,
   grams,
-  JUNK_TITLE,
+  isHealthClaim,
   norm,
   NOT_FOOD,
   PROTEIN_GUARD,
@@ -264,7 +264,7 @@ for (const r of src) {
   const title = cleanTitle(r.Name ?? '');
 
   // Denetim 2 — sağlık iddiası içeriği yemek değil.
-  if (JUNK_TITLE.test(title)) {
+  if (isHealthClaim(title)) {
     skippedJunk += 1;
     continue;
   }
@@ -352,8 +352,13 @@ for (const r of src) {
       ? prep.minutes
       : Math.min(120, 10 + steps.length * 6);
 
-  const method = METHOD_RULES.find(([re]) => re.test(steps.join(' ')))?.[1] ?? 'tava';
   const cat = refineCategory(title, CATEGORY[r.MainCategory] ?? 'etli-sulu');
+
+  // Varsayılan `tava` değil: adımlarda pişirme fiili geçmeyen tarif çoğu zaman
+  // pişmiyor demektir (cacık, piyaz, turşu). Bkz. 05-tarif-ithal.ts'teki not.
+  const method =
+    METHOD_RULES.find(([re]) => re.test(steps.join(' ')))?.[1] ??
+    (cat === 'icecek' ? 'karistir' : isSogukYemek(title) ? 'cig' : 'tava');
 
   /**
    * Kaynakta zorluk alanı yok. Adım sayısı ile süreden tahmin ediyoruz:

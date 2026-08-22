@@ -12,6 +12,7 @@
 
 import { INGREDIENTS } from '../../src/data/catalog/index.ts';
 import { gramsFor } from '../../src/data/catalog/olcu.ts';
+import { herhangiBiri, kelimeBasi, tamKelime } from '../../src/data/catalog/tr-kelime.ts';
 
 const norm = (s: string) =>
   s
@@ -421,9 +422,47 @@ const NOT_FOOD = new Set([
  * Korpusta yemek olmayan "kür" içerikleri var: zayıflatan çay, detoks suyu,
  * öksürük şurubu. Bunlar tarif değil sağlık iddiası; uygulamada hiçbir işleri
  * yok ve menü kurucuda içecek diye karşımıza çıkıyorlardı.
+ *
+ * Kalıp tek bir düz regex'ti ve iki yöne birden yanılıyordu.
+ *
+ * **Kaçırdığı:** `göbek eriten` iki kelimenin yan yana gelmesini bekliyor.
+ * "En Etkili Göbek Eritme Çayı" ekte tutmadığı için, "Göbek Yağlarını Eriten
+ * Salatalık Çayı" araya kelime girdiği için geçti. İkincisi adında "salata"
+ * geçtiği için mezelere düştü; birincisini menü kurucu akşam yemeğinin
+ * içeceği diye servis etti.
+ *
+ * **Yanlış elediği:** `\bkür\b` sınırı ASCII'ye göre çalışıyor. "tükürük"
+ * kelimesinde `kür`ün iki yanında da ü var, JavaScript ikisini de kelime
+ * sınırı sayıyor ve gerçek bir tarif olan "Tükürük Köftesi" sağlık iddiası
+ * diye eleniyordu.
+ *
+ * Sınırlar artık `tr-kelime.ts`'ten geliyor. Kalıbı gevşetmek çözüm değil:
+ * düz `erit` yazınca "Şerit Poğaça" ile "Çikolata Eritme", düz `kür` yazınca
+ * "Kürdan Kebabı" gidiyor.
+ *
+ * Ad `norm`'dan geçirilerek sınanıyor; `İ` Türkçe'ye göre küçültülmezse
+ * "Sağlığına İyi Gelen" kalıbı `iyi gelen` ile eşleşmiyor.
  */
-const JUNK_TITLE =
-  /zayıflat|yağ yak|metabolizma|\bkür\b|kürü|detoks|öksürük|şifalı|ödem attıran|göbek eriten|kilo ver|horlama|uykuyu|kabızlık|bağışıklık|iyi gelen/i;
+const HEALTH_CLAIM: RegExp[] = [
+  kelimeBasi(
+    'zayıfla', 'kilo ver', 'detoks', 'toksin', 'metabolizma', 'selülit',
+    'öksürük', 'kabızlık', 'horlama', 'uykuyu', 'bağışıklık', 'şifalı',
+    'iyi gelen',
+    // "ödem" tek başına yazılamıyor: "Ödemiş Köftesi" gerçek bir yemek.
+    'ödem at', 'ödem sök',
+  ),
+  // "kür"e kelime başı yetmiyor: "kürdan", "kürek", "küre" de tutuyor.
+  tamKelime('kür', 'kürü', 'kürün', 'küründe', 'kürler', 'kürleri'),
+  // Vaat kalıbı: hedef + fiil, araya birkaç kelime girebiliyor.
+  kelimeBasi('göbek( [^ ]+){0,3} erit', 'basen( [^ ]+){0,3} erit'),
+  // Kelime başı şart — "tereyağı eritme" ve "zeytinyağlı" masum.
+  kelimeBasi('yağ(ı|ını|ları|larını)?( [^ ]+){0,2} (yak|erit)'),
+];
+
+/** Ad bir sağlık iddiası mı? İki içe aktarıcı da bu denetimi kullanıyor. */
+function isHealthClaim(title: string): boolean {
+  return herhangiBiri(HEALTH_CLAIM, norm(title));
+}
 
 /**
  * Katı eşleştirme — yalnızca kesin ad, ASCII katlanmış ad ya da eş anlamlı.
@@ -475,6 +514,6 @@ export {
   PROTEIN_GUARD,
   ANIMAL_CATS,
   NOT_FOOD,
-  JUNK_TITLE,
+  isHealthClaim,
   DESCRIPTOR,
 };
